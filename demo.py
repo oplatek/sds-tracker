@@ -60,6 +60,7 @@ for e in range(c.epochs):
     random.shuffle(train)  # fix the seed
     logger.info('Train epoch %d: %d / %d interrupted', e, skipped_dial, len(train)) 
     if e % c.validate_every == 0:
+	# FIXME loop over dev data
         accs = np.empty(shape=(0, len(labels)))
         for turn in dialog:
             sys_utt, usr_utt, usr_asr, asr_score, slots = turn
