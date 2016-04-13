@@ -3,18 +3,18 @@
 import json, logging, uuid, random
 import tensorflow as tf
 import numpy as np
-from tracker.utils import Config, Vocabulary
+from tracker.utils import Config, Vocabulary, pad, labels2words
 from tracker.model import GRUJoint
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-c = Config()
+c = Config()  # FIXME load config from json_file after few commints when everybody knows the settings
 c.seed=123
 c.train_file = './data.dstc2.train.json'
 c.dev_file = './data.dstc2.dev.json'
-c.epochs = 10
+c.epochs = 2
 c.config_file = 'log/demo_%s' % uuid.uuid1()
 c.vocab_file = '%s.vocab' % c.config_file
 c.labels_file = '%s.labels' % c.config_file
@@ -50,8 +50,8 @@ for e in range(c.epochs):
     for d_i, dialog in enumerate(train):
         for turn in dialog:
             sys_utt, usr_utt, usr_asr, asr_score, slots = turn
-            input_val = [vocab.get_i(w) for w in (sys_utt + c.sys_usr_delim + usr_utt).split()]
-            labels_val = labels.get_i(slots)
+            input_val = pad([vocab.get_i(w) for w in (sys_utt + c.sys_usr_delim + usr_utt).split()], c.max_seq_len)
+            labels_val = np.array(labels.get_i(slots)); labels_val.shape = (1, 1)
             if len(input_val) > c.max_seq_len:
                 skipped_dial += 1
                 break  # stop processing the rest of dialog
@@ -60,15 +60,15 @@ for e in range(c.epochs):
     random.shuffle(train)  # fix the seed
     logger.info('Train epoch %d: %d / %d interrupted', e, skipped_dial, len(train)) 
     if e % c.validate_every == 0:
-	# FIXME loop over dev data
-        accs = np.empty(shape=(0, len(labels)))
-        for turn in dialog:
-            sys_utt, usr_utt, usr_asr, asr_score, slots = turn
-            input_val = [vocab.get_i(w) for w in (sys_utt + c.sys_usr_delim + usr_utt).split()]
-            labels_val = labels.get_i(slots)
-            y, loss, acc = sess.run([m.predict, m.loss, m.acc], feed_dict={m.input: input_val, m.labels: labels_val})
-            accs = np.vstack(accs, acc)
-            logger.debug('Sys: %s\nUsr: %s\nSlots: %s\nSlotsY: %s\nAcc: %d\nLoss: %d', sys_utt, usr_utt, slots, [labels.get_w(i) for i in y], acc, loss)
+        accs = np.empty(shape=(0, 1))
+        for d_i, dialog in enumerate(dev):
+            for turn in dialog:
+                sys_utt, usr_utt, usr_asr, asr_score, slots = turn
+                input_val = pad([vocab.get_i(w) for w in (sys_utt + c.sys_usr_delim + usr_utt).split()], c.max_seq_len)
+                labels_val = np.array(labels.get_i(slots)); labels_val.shape = (1, 1)
+                y, loss, acc = sess.run([m.predict, m.loss, m.acc], feed_dict={m.input: input_val, m.labels: labels_val})
+                accs = np.vstack((accs, acc))
+                logger.debug('Sys: %s\nUsr: %s\nSlots: %s\nSlotsY: %s\nAcc: %d\nLoss: %d', sys_utt, usr_utt, slots, labels2words(y, labels), acc, loss)
         logger.info('Accuracy for epoch %d: %f', e, np.mean(accs, axis=0))
 
 vocab.save(c.vocab_file)

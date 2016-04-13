@@ -2,6 +2,22 @@
 # -*- coding: utf-8 -*-
 from collections import Counter
 import json
+import numpy as np
+
+
+# FIXME rewrite for batch
+def pad(arr, max_len):
+    to_pad = max_len - len(arr)
+    arr = np.array(arr + ([0] * to_pad))
+    arr.shape = (1, max_len)
+    return arr
+
+
+def labels2words(lbl, vocab):
+    lables = []
+    for i in range(lbl.shape[0]):
+        lables.append([vocab.get_w(k) for k in lbl[i, :]])
+    return lables
 
 
 class Config:
@@ -39,9 +55,8 @@ class Vocabulary:
         self.unk = unk
         self.max_items = max_items
         tmp = list(self.extra_words) + [w for w, _ in self._counts.most_common(max_items)]
-        self._w2int = dict(((w, i) for w, i in enumerate(tmp)))
-        self._int2w = dict(((i, w) for w, i in enumerate(tmp)))
-        print(self._w2int)
+        self._w2int = dict(((w, i) for i, w in enumerate(tmp)))
+        self._int2w = dict(((i, w) for i, w in enumerate(tmp)))
 
     def get_i(self, w):
         return self._w2int.get(w, self._w2int[self.unk])
