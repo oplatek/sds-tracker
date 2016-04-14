@@ -59,7 +59,9 @@ for e in range(c.epochs):
             logger.debug('Sys: %s\nUsr: %s\nSlots: %s\nLoss: %f\n', sys_utt, usr_utt, slots, loss)
     random.shuffle(train)  # fix the seed
     logger.info('Train epoch %d: %d / %d interrupted', e, skipped_dial, len(train)) 
+
     if e % c.validate_every == 0:
+        logger.info('Validating after %d epochs of training', e)
         accs = np.empty(shape=(0, 1))
         for d_i, dialog in enumerate(dev):
             for turn in dialog:
@@ -71,6 +73,7 @@ for e in range(c.epochs):
                 logger.debug('Sys: %s\nUsr: %s\nSlots: %s\nSlotsY: %s\nAcc: %d\nLoss: %d', sys_utt, usr_utt, slots, labels2words(y, labels), acc, loss)
         logger.info('Accuracy for epoch %d: %f', e, np.mean(accs, axis=0))
 
+# 
 vocab.save(c.vocab_file)
 labels.save(c.labels_file)
 c.save(c.config_file)
