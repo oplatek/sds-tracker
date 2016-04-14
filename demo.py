@@ -3,7 +3,7 @@
 import json, logging, uuid, random
 import tensorflow as tf
 import numpy as np
-from tracker.utils import Config, Vocabulary, pad, labels2words
+from tracker.utils import Config, Vocabulary, pad, labels2words, git_info
 from tracker.model import GRUJoint
 
 
@@ -11,13 +11,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 c = Config()  # FIXME load config from json_file after few commints when everybody knows the settings
+c.name='log/demo_%s' % uuid.uuid1()
+c.filename = '%s.json' % c.name
+c.vocab_file = '%s.vocab' % c.name
+c.labels_file = '%s.labels' % c.name
 c.seed=123
 c.train_file = './data.dstc2.train.json'
 c.dev_file = './data.dstc2.dev.json'
 c.epochs = 2
-c.config_file = 'log/demo_%s' % uuid.uuid1()
-c.vocab_file = '%s.vocab' % c.config_file
-c.labels_file = '%s.labels' % c.config_file
 c.sys_usr_delim = ' SYS_USR_DELIM '
 c.learning_rate = 0.00005
 c.max_seq_len = 60
@@ -27,14 +28,17 @@ random.seed(c.seed)
 train = json.load(open(c.train_file))
 dev = json.load(open(c.dev_file))
 
-# words apearing in system utterances, user utterances plus delimiter between the two
+logger.info('Turn is encodeded as single sequence of words: "system utterace + DELIM + user utterance"')
 vocab = Vocabulary([w for dialog in train for turn in dialog for w in (turn[0] + turn[1]).split()], 
         extra_words=[c.sys_usr_delim])
-# join slots as string e.g. "indian east moderate"
+logger.info('Labels are join slots represented as string e.g. "indian east moderate"')
 labels = Vocabulary([turn[4] for dialog in train for turn in dialog])
 
+logger.info('Saving automatically generated stats to config')
+c.git_info = git_info()
 c.vocab_size = len(vocab)
 c.labels_size = len(labels)
+logger.info('Config\n\n: %s\n\n', c)
 
 m = GRUJoint(c)
 optimizer = tf.train.GradientDescentOptimizer(c.learning_rate)
@@ -76,4 +80,4 @@ for e in range(c.epochs):
 # 
 vocab.save(c.vocab_file)
 labels.save(c.labels_file)
-c.save(c.config_file)
+c.save(c.filename)

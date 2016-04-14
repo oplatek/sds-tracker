@@ -6,6 +6,7 @@ import numpy as np
 
 class GRUJoint():
     def __init__(self, config):
+
         self.input = tf.placeholder("float", [config.batch_size, config.max_seq_len], name='input')
         self.labels = tf.placeholder("float", [config.batch_size, 1], name='labels')  # FIXME convert index to one-hot vector in TF
         self.loss = tf.Variable(6 * np.ones([config.batch_size, 1], dtype=np.float32))
