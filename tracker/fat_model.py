@@ -3,6 +3,8 @@
 
 import tensorflow as tf
 from tensorflow.python.ops.rnn_cell import GRUCell
+from tensorflow.python.ops.functional_ops import scan
+
 
 __author__ = 'Petr Belohlavek, Vojtech Hudecek'
 
@@ -21,48 +23,45 @@ class FatModel:
     m = MLP hidden layer dimension
     """
     def __init__(self, config):
-        self.gru_n_steps = config.max_seq_len
-        self.state_dim = config.hidden_state_dim
-        self.output_dim = config.labels_size
-        self.vocab_size = config.vocab_size
-        self.emb_dim = config.embedding_dim
-        self.batch_size = config.batch_size
+        self.config = config
 
-        self.input = tf.placeholder("int32", [self.batch_size, config.max_seq_len], name='input')
-        self.labels = tf.placeholder("float32", [self.batch_size, self.output_dim], name='labels')  # FIXME convert index to one-hot vector in TF
+        self.input = tf.placeholder("int32", [self.config.batch_size, config.max_seq_len], name='input')
+        self.labels = tf.placeholder("float32", [self.config.batch_size, self.config.output_dim], name='labels')
 
-        self.gru = GRUCell(self.state_dim)
+        self.gru = GRUCell(self.config.hidden_state_dim)
 
         # MLP params
-        self.mlp_n_hidden = config.mlp_hidden_layer_dim
-        self.mlp_input2hidden_W = tf.Variable(tf.random_normal([self.state_dim, self.mlp_n_hidden]))
-        self.mlp_input2hidden_B = tf.Variable(tf.random_normal([self.mlp_n_hidden]))
+        self.mlp_input2hidden_W = tf.Variable(tf.random_normal([self.config.hidden_state_dim,
+                                                                self.config.mlp_hidden_layer_dim]))
+        self.mlp_input2hidden_B = tf.Variable(tf.random_normal([self.config.mlp_hidden_layer_dim]))
 
-        self.mlp_hidden2output_W = tf.Variable(tf.random_normal([self.mlp_n_hidden, self.output_dim]))
-        self.mlp_hidden2output_B = tf.Variable(tf.random_normal([self.output_dim]))
+        self.mlp_hidden2output_W = tf.Variable(tf.random_normal([self.config.mlp_hidden_layer_dim,
+                                                                 self.config.output_dim]))
+        self.mlp_hidden2output_B = tf.Variable(tf.random_normal([self.config.output_dim]))
 
         # fun part
-        embeddings_we = tf.random_uniform([self.vocab_size, self.emb_dim])
-        state_bh, logits_o, probability_o = self.one_turn(tf.ones([self.batch_size, self.state_dim]),
-                                                          tf.nn.embedding_lookup(embeddings_we, self.input))
+        self.embeddings_we = tf.random_uniform([self.config.vocab_size, self.config.embedding_dim])
+        state_bh, logits_bo, probability_bo = self.one_turn(tf.ones([self.config.batch_size,
+                                                                     self.config.hidden_state_dim]),
+                                                            tf.nn.embedding_lookup(self.embeddings_we, self.input))
 
-        cost = self.one_cost(logits_o, self.labels)
-
-        # boring part
-        self.loss = cost
-        self.predict = probability_o
-        self.logits = logits_o
+        self.loss = self.one_cost(logits_bo, self.labels)
+        self.probabilities = probability_bo
+        # self.predict = tf.argmax(probability_bo, 0)
+        self.logits = logits_bo
 
     def mlp(self, input_layer_bh):
-        hidden_layer_bm = tf.nn.sigmoid(tf.matmul(input_layer_bh, self.mlp_input2hidden_W) + broadcast_vector2matrix(self.mlp_input2hidden_B, self.batch_size))
-        output_layer_bo = tf.nn.sigmoid(tf.matmul(hidden_layer_bm, self.mlp_hidden2output_W) + broadcast_vector2matrix(self.mlp_hidden2output_B, self.batch_size))
+        hidden_layer_bm = tf.nn.sigmoid(tf.matmul(input_layer_bh, self.mlp_input2hidden_W) +
+                                        broadcast_vector2matrix(self.mlp_input2hidden_B, self.config.batch_size))
+        output_layer_bo = tf.nn.sigmoid(tf.matmul(hidden_layer_bm, self.mlp_hidden2output_W) +
+                                        broadcast_vector2matrix(self.mlp_hidden2output_B, self.config.batch_size))
         return output_layer_bo
 
     def one_turn(self, state_bh, input_bte):
-        for step in range(self.gru_n_steps):
-            if step > 0:
-                tf.get_variable_scope().reuse_variables()
-            _output, state_bh = self.gru(input_bte[:,step,:], state_bh)
+        state_tbh = scan(fn=lambda last_state_bh, curr_input_bte: self.gru(curr_input_bte, last_state_bh)[1],
+                         elems=tf.transpose(input_bte, perm=[1, 0, 2]),
+                         initializer=state_bh)
+        state_bh = state_tbh[state_tbh.get_shape()[0]-1, :, :]
 
         logits_bo = self.mlp(state_bh)
         probability_bo = tf.nn.softmax(logits_bo)
