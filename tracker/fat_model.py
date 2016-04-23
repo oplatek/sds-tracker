@@ -50,6 +50,10 @@ class FatModel:
         # self.predict = tf.argmax(probability_bo, 0)
         self.logits = logits_bo
 
+        # TensorBoard
+        tf.scalar_summary('loss/loss', self.loss)
+        self.tb_info = tf.merge_all_summaries()
+
     def mlp(self, input_layer_bh):
         hidden_layer_bm = tf.nn.sigmoid(tf.matmul(input_layer_bh, self.mlp_input2hidden_W) +
                                         broadcast_vector2matrix(self.mlp_input2hidden_B, self.config.batch_size))

@@ -56,14 +56,17 @@ if __name__ == '__main__':
     logger.info('Run init')
     sess.run(init)
 
+    train_writer = tf.train.SummaryWriter('log/', sess.graph)
+
     # Training part
     for e in range(c.epochs):
         skipped_dial = 0
-        for step in range(1000):
-            _, loss = sess.run([train_op, m.loss], feed_dict={m.input: input_val, m.labels: labels_val})
+        for step in range(100):
+            _, loss, tb_info = sess.run([train_op, m.loss, m.tb_info], feed_dict={m.input: input_val, m.labels: labels_val})
+            train_writer.add_summary(tb_info, step)
 
-            if step % 300 == 0:
-                logger.debug('Average Batch Loss @%d/%d = %f', e, step, loss)
-                results = sess.run([m.probabilities, m.logits], feed_dict={m.input: input_val})
-                logging.debug('Probs:\n%s', results[0])
-                logging.debug('logits:\n%s', results[1])
+        if step % 300 == 0:
+            logger.debug('Average Batch Loss @%d/%d = %f', e, step, loss)
+            results = sess.run([m.probabilities, m.logits], feed_dict={m.input: input_val})
+            logging.debug('Probs:\n%s', results[0])
+            logging.debug('logits:\n%s', results[1])
