@@ -50,16 +50,16 @@ train_set.labels_vocab.save(c.labels_file)
 c.save(c.filename)
 
 m = GRUJoint(train_set.turns, train_set.turn_lens, train_set.labels, c)
-t = TrainingOps(m.loss, tf.train.GradientDescentOptimizer(c.learning_rate))
+t = TrainingOps(m.tr_loss, tf.train.GradientDescentOptimizer(c.learning_rate))
 
 sess = tf.Session()
 init = tf.initialize_all_variables()
 sess.run(init)
-sess.run(m.turn_initializer, feed_dict={m.turn_initializer: train_set.turns})
-sess.run(m.labels_initializer, feed_dict={m.labels_initializer: train_set.labels})
-sess.run(m.turn_len_initialzer, feed_dict={m.turn_len_initialzer: train_set.turns_len})
+sess.run(m.turn_inputs.initializer, feed_dict={m.turn_initializer: train_set.turns})
+sess.run(m.turn_lengths.initializer, feed_dict={m.turn_len_initialzer: train_set.turn_lens})
+sess.run(m.input_labels.initializer, feed_dict={m.labels_initializer: train_set.labels})
 
-stopper = EarlyStopper(c.nbest_models, c.not_change_limit)
+stopper = EarlyStopper(c.nbest_models, c.not_change_limit, c.name)
 summary_writer = tf.train.SummaryWriter(c.train_dir, sess.graph)
 summarize = tf.merge_all_summaries()
 
@@ -71,19 +71,19 @@ try:
     step = 0
     while not coord.should_stop():
         if step % 100:
-            _, step, loss_val, summ_str = sess.run([t.train_op, t.global_step, m.tr_loss, summarize], feed_dict={m.dropout_keep_prob: c.dropbout})
+            _, step, loss_val, summ_str = sess.run([t.train_op, t.global_step, m.tr_loss, summarize], feed_dict={m.dropout_keep_prob: c.dropout})
             logger.debug('Step %7d, Loss: %f', step, loss_val)
             summary_writer.add_summary(summ_str, step)
         else:
-            _, step = sess.run([t.train_op, t.global_step], feed_dict={m.dropout_keep_prob: c.dropbout})
+            _, step = sess.run([t.train_op, t.global_step], feed_dict={m.dropout_keep_prob: c.dropout})
 
         if step % c.validate_every == 0:
             true_count, processed = 0, 0
             devlen, devbs = len(dev_set.labels), dev_set.batch_size  # shortcuts
             for i, (b, e) in enumerate(zip(range(0, devlen, devbs), range(devbs, devlen, devbs))):
-                turns_val, turns_len_val, labels_val = dev_set.turns[b, e], dev_set.turns_len[b, e], dev_set.labels[b, e]
+                turns_val, turn_lens_val, labels_val = dev_set.turns[b, e], dev_set.turn_lens[b, e], dev_set.labels[b, e]
                 true_count += np.sum(sess.run(m.dev_true_count, feed_dict={m.dropout_keep_prob: 1.0,
-                    m.feed_turns: turns_val, m.feed_turns_len: turns_len_val, m.feed_labels: labels_val}))
+                    m.feed_turns: turns_val, m.feed_turn_lens: turn_lens_val, m.feed_labels: labels_val}))
                 processed = i * c.dev_batch_size
                 logger.debug('Training step: %d, Dev iter: %d, Acc: %f', step, i, true_count / processed)
             dev_acc = true_count / processed

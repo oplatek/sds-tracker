@@ -15,33 +15,32 @@ class GRUJoint():
         logger.info('inputs_val.shape %s, inputs_len_val.shape %s, labels_val.shape %s', inputs_val.shape, inputs_len_val.shape, labels_val.shape)
 
         start = time.time()
-        with tf.Graph().as_default():
-            self.dropout_keep_prob = tf.placeholder('float')
-            with tf.variable_scope('train_input'):
+        self.dropout_keep_prob = tf.placeholder('float')
+        with tf.variable_scope('train_input'):
 
-                turn_initializer = tf.placeholder(shape=inputs_val.shape, dtype=inputs_val.dtype)
-                labels_initializer = tf.placeholder(shape=labels_val.shape, dtype=labels_val.dtype)
-                turn_len_initialzer = tf.placeholder(shape=inputs_len_val.shape, dtype=inputs_len_val.dtype)
+            self.turn_initializer = ti = tf.placeholder(shape=inputs_val.shape, dtype=inputs_val.dtype)
+            self.turn_len_initialzer = tli = tf.placeholder(shape=inputs_len_val.shape, dtype=inputs_len_val.dtype)
+            self.labels_initializer = li = tf.placeholder(shape=labels_val.shape, dtype=labels_val.dtype)
 
-                turn_inputs = tf.Variable(turn_initializer, trainable=False, collections=[])
-                turn_lengths = tf.Variable(turn_len_initialzer, trainable=False, collections=[])
-                input_labels = tf.Variable(labels_initializer, trainable=False, collections=[])
+            self.turn_inputs = tis = tf.Variable(ti, trainable=False, collections=[])
+            self.turn_lengths = tls = tf.Variable(tli, trainable=False, collections=[])
+            self.input_labels = ils = tf.Variable(li, trainable=False, collections=[])
 
-                turn, turn_len, label = tf.train.slice_input_producer([turn_inputs, turn_lengths, input_labels])
-                turns, turn_lens, labels = tf.train.batch([turn, turn_len, label], batch_size=c.batch_size) 
+            turn, turn_len, label = tf.train.slice_input_producer([tis, tls, ils])
+            turns, turn_lens, labels = tf.train.batch([turn, turn_len, label], batch_size=c.batch_size) 
 
-                with tf.variable_scope('graph') as graph_scope:
-                    self.tr_logits, self.tr_loss, self.tr_true_count = self.__class__._build_graph(
-                            turns, turn_lens, labels, self.dropout_keep_prob, c)
+            with tf.variable_scope('graph') as graph_scope:
+                self.tr_logits, self.tr_loss, self.tr_true_count = self.__class__._build_graph(
+                        turns, turn_lens, labels, self.dropout_keep_prob, c)
 
-            with tf.variable_scope('dev_input'):
-                self.feed_turns = turns =tf.placeholder(shape=[c.batch_size, None], dtype=tf.int64)
-                self.feed_labels = labels = tf.placeholder(shape=[c.batch_size, c.labels_size], dtype=tf.int64)
-                self.feed_turns_len = turn_lens = tf.placeholder(shape=[c.batch_size, None], dtype=tf.int64)
-                # reusing the same parameters from the graph where are trained
-                with tf.variable_scope(graph_scope, reuse=True):
-                    self.dev_logits, self.dev_loss, self.dev_true_count = self.__class__._build_graph(
-                            turns, turn_lens, labels, self.dropout_keep_prob, c)
+        with tf.variable_scope('dev_input'):
+            self.feed_turns = turns =tf.placeholder(shape=[c.dev_batch_size, c.max_seq_len], dtype=tf.int64)
+            self.feed_labels = labels = tf.placeholder(shape=[c.dev_batch_size], dtype=tf.int64)
+            self.feed_turn_lens = turn_lens = tf.placeholder(shape=[c.dev_batch_size], dtype=tf.int64)
+            # reusing the same parameters from the graph where are trained
+            with tf.variable_scope(graph_scope, reuse=True):
+                self.dev_logits, self.dev_loss, self.dev_true_count = self.__class__._build_graph(
+                        turns, turn_lens, labels, self.dropout_keep_prob, c)
         logger.info('Loaded time %s', time.time() - start)
 
     @staticmethod
@@ -78,8 +77,7 @@ class GRUJoint():
 
         with tf.variable_scope('loss'):
             logger.debug('labels.get_shape(): %s', labels.get_shape())
-            logger.debug('tf.to_int64(labels).get_shape(): %s', tf.to_int64(labels).get_shape())
-            # xent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, tf.to_int64(labels), name='crossentropy')
+            logger.debug('tf.to_int64(labels).get_shape(): %s', labels.get_shape())
             xent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, labels, name='crossentropy')
             loss = tf.reduce_mean(xent, name='xentropy_mean')
             logger.debug('xent.get_shape(): %s', xent.get_shape())
@@ -89,4 +87,5 @@ class GRUJoint():
             true_count = tf.nn.in_top_k(logits, labels, 1)
             # FIXME compute also accuracy similar like global_step is computed
             logger.debug('true_count.get_shape(): %s', true_count.get_shape())
+        logger.info('trainable variables: %s', '\n'.join([str((v.name, v.get_shape())) for v in tf.trainable_variables()]))
         return (logits, loss, true_count)

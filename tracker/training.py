@@ -23,7 +23,7 @@ class EarlyStopper(object):
         self.not_change_limit = not_change_limit
         self._heap = []
         self._not_improved = 0
-        self.saver = tf.train.saver()
+        self.saver = tf.train.Saver()
         self.saver_prefix = saver_prefix
 
     @property

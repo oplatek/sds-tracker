@@ -12,7 +12,7 @@ class Dstc2(TurnTrackerSet):
             sys_usr_delim='DELIM', start_turn=None, turn_len=None, first_n=None):
         start_turn = start_turn or ('START_TURN_SYS', 'STAR_USR', None, None, "none none none")
         self._raw_data = raw_data = json.load(open(filename))
-        self.first_n = min(first_n, len(raw_data)) if first_n else len(raw_data)
+        self._first_n = min(first_n, len(raw_data)) if first_n else len(raw_data)
         turns = [(turn[0] + ' %s ' % sys_usr_delim + turn[1]).split() for dialog in raw_data for turn in [start_turn] + dialog]
         labels = [turn[4] for dialog in raw_data for turn in [start_turn] + dialog]
 
@@ -34,9 +34,10 @@ class Dstc2(TurnTrackerSet):
             for j, w in enumerate(t):
                 self._turns[i, j] = self._vocab.get_i(w)
         logger.info('Labels are join slots represented as string e.g. "indian east moderate"')
-        self._labels = np.empty((len(labels),), dtype=np.int64)
-        for t, lb in enumerate(labels):
-            self._labels[t] = self._lab_vocab.get_i(lb)
+        self._labels = np.array([self.labels_vocab.get_i(l) for l in labels], dtype=np.int64)
+
+    def __len__(self):
+        return self._first_n
 
     @property
     def turns(self):
@@ -48,7 +49,7 @@ class Dstc2(TurnTrackerSet):
         return self._turns
 
     @property
-    def labels(self, first_n=None):
+    def labels(self):
         '''
         Returns list of fixed length numpy arrays
         '''
