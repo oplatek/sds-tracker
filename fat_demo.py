@@ -63,12 +63,13 @@ if __name__ == '__main__':
 
     # Training part
     epoch_loss = 0
+    train_summary = None
     for e in range(c.epochs):
         skipped_dial = 0
         for step in range(100):
-            _, loss, tb_info = sess.run([train_op, m.loss, m.tb_info], feed_dict={m.input: input_val, m.labels: labels_val})
-            epoch_loss = loss
-            train_writer.add_summary(tb_info, step)
+            _, epoch_loss, train_summary= sess.run([train_op, m.loss, m.tb_info], feed_dict={m.input: input_val, m.labels: labels_val})
+            # epoch_loss = loss
+        train_writer.add_summary(train_summary, e)
 
         logger.debug('Average Batch Loss @%d = %f', e, epoch_loss)
         results = sess.run([m.probabilities, m.logits, m.predict, m.accuracy],
