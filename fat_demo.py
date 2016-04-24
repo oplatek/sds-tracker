@@ -21,10 +21,11 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
     logger = logging.getLogger(__name__)
 
-    input_val = np.array([[1, 2, 3, 4],
-                          [1, 2, 3, 4]], dtype='int32')
-    labels_val = np.array([[1, 0, 0],
-                           [1, 0, 0]], dtype='float32')
+    input_val = np.array([[1, 2, 2, 4],
+                          [1, 3, 3, 4]], dtype='int32')
+    # labels_val = np.array([[1, 0, 0],
+    #                        [0, 1, 0]], dtype='float32')
+    labels_val = np.array([0, 1], dtype='int64')
 
     assert input_val.shape[0] == labels_val.shape[0]
 
@@ -35,7 +36,8 @@ if __name__ == '__main__':
     random.seed(c.seed)
 
     c.vocab_size = np.max(input_val) + 1
-    c.batch_size, c.output_dim = labels_val.shape
+    c.batch_size = labels_val.shape[0]
+    c.output_dim = np.max(labels_val) + 1
     c.max_seq_len = input_val.shape[1]
     c.embedding_dim = 10
     c.hidden_state_dim = 50
@@ -59,14 +61,15 @@ if __name__ == '__main__':
     train_writer = tf.train.SummaryWriter('log/', sess.graph)
 
     # Training part
+    epoch_loss = 0
     for e in range(c.epochs):
         skipped_dial = 0
         for step in range(100):
             _, loss, tb_info = sess.run([train_op, m.loss, m.tb_info], feed_dict={m.input: input_val, m.labels: labels_val})
+            epoch_loss = loss
             train_writer.add_summary(tb_info, step)
 
-        if step % 300 == 0:
-            logger.debug('Average Batch Loss @%d/%d = %f', e, step, loss)
-            results = sess.run([m.probabilities, m.logits], feed_dict={m.input: input_val})
-            logging.debug('Probs:\n%s', results[0])
-            logging.debug('logits:\n%s', results[1])
+        logger.debug('Average Batch Loss @%d = %f', e, epoch_loss)
+        results = sess.run([m.probabilities, m.logits], feed_dict={m.input: input_val})
+        logging.debug('Probs:\n%s', results[0])
+        logging.debug('logits:\n%s', results[1])

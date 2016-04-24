@@ -26,7 +26,16 @@ class FatModel:
         self.config = config
 
         self.input = tf.placeholder("int32", [self.config.batch_size, config.max_seq_len], name='input')
-        self.labels = tf.placeholder("float32", [self.config.batch_size, self.config.output_dim], name='labels')
+        self.labels = tf.placeholder("int64", [self.config.batch_size], name='labels')
+        self.labels_one_hot = tf.one_hot(indices=self.labels,
+                                         depth=config.output_dim,
+                                         on_value=1.0,
+                                         off_value=0.0,
+                                         axis=-1)
+                                         #
+                                         #
+                                         # "float32", [self.config.batch_size, self.config.output_dim],
+                                         #     name='labels_one_hot')
 
         self.gru = GRUCell(self.config.hidden_state_dim)
 
@@ -45,7 +54,7 @@ class FatModel:
                                                                      self.config.hidden_state_dim]),
                                                             tf.nn.embedding_lookup(self.embeddings_we, self.input))
 
-        self.loss = self.one_cost(logits_bo, self.labels)
+        self.loss = self.one_cost(logits_bo, self.labels_one_hot)
         self.probabilities = probability_bo
         # self.predict = tf.argmax(probability_bo, 0)
         self.logits = logits_bo
