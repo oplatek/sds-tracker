@@ -56,11 +56,13 @@ class FatModel:
 
         self.loss = self.one_cost(logits_bo, self.labels_one_hot)
         self.probabilities = probability_bo
-        # self.predict = tf.argmax(probability_bo, 0)
+        self.predict = tf.argmax(probability_bo, 0, name='prediction')
+        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predict, self.labels), 'float32'), name='accuracy')
         self.logits = logits_bo
 
         # TensorBoard
-        tf.scalar_summary('loss/loss', self.loss)
+        tf.scalar_summary('CCE loss', self.loss)
+        tf.scalar_summary('Accuracy', self.accuracy)
         self.tb_info = tf.merge_all_summaries()
 
     def mlp(self, input_layer_bh):

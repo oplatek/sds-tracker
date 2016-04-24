@@ -22,16 +22,17 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     input_val = np.array([[1, 2, 2, 4],
-                          [1, 3, 3, 4]], dtype='int32')
+                          [1, 3, 3, 4],
+                          [1, 0, 0, 4]], dtype='int32')
     # labels_val = np.array([[1, 0, 0],
     #                        [0, 1, 0]], dtype='float32')
-    labels_val = np.array([0, 1], dtype='int64')
+    labels_val = np.array([0, 1, 2], dtype='int64')
 
     assert input_val.shape[0] == labels_val.shape[0]
 
     c = Config()
     c.seed = 123
-    c.epochs = 20
+    c.epochs = 200
     c.learning_rate = 0.005
     random.seed(c.seed)
 
@@ -70,6 +71,9 @@ if __name__ == '__main__':
             train_writer.add_summary(tb_info, step)
 
         logger.debug('Average Batch Loss @%d = %f', e, epoch_loss)
-        results = sess.run([m.probabilities, m.logits], feed_dict={m.input: input_val})
+        results = sess.run([m.probabilities, m.logits, m.predict, m.accuracy],
+                           feed_dict={m.input: input_val, m.labels: labels_val})
         logging.debug('Probs:\n%s', results[0])
-        logging.debug('logits:\n%s', results[1])
+        logging.debug('Logits:\n%s', results[1])
+        logging.debug('Predict:\n%s', results[2])
+        logging.debug('Accuracy:\n%s', results[3])
