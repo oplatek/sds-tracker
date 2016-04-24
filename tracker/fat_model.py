@@ -25,17 +25,13 @@ class FatModel:
     def __init__(self, config):
         self.config = config
 
-        self.input = tf.placeholder("int32", [self.config.batch_size, config.max_seq_len], name='input')
-        self.labels = tf.placeholder("int64", [self.config.batch_size], name='labels')
+        self.input = tf.placeholder('int32', [self.config.batch_size, config.max_seq_len], name='input')
+        self.labels = tf.placeholder('int64', [self.config.batch_size], name='labels')
         self.labels_one_hot = tf.one_hot(indices=self.labels,
                                          depth=config.output_dim,
                                          on_value=1.0,
                                          off_value=0.0,
                                          axis=-1)
-                                         #
-                                         #
-                                         # "float32", [self.config.batch_size, self.config.output_dim],
-                                         #     name='labels_one_hot')
 
         self.gru = GRUCell(self.config.hidden_state_dim)
 
@@ -68,8 +64,13 @@ class FatModel:
     def mlp(self, input_layer_bh):
         hidden_layer_bm = tf.nn.sigmoid(tf.matmul(input_layer_bh, self.mlp_input2hidden_W) +
                                         broadcast_vector2matrix(self.mlp_input2hidden_B, self.config.batch_size))
+
+        tf.histogram_summary('MLP Hidden', hidden_layer_bm)
+
         output_layer_bo = tf.nn.sigmoid(tf.matmul(hidden_layer_bm, self.mlp_hidden2output_W) +
                                         broadcast_vector2matrix(self.mlp_hidden2output_B, self.config.batch_size))
+        tf.histogram_summary('MLP Output', output_layer_bo)
+
         return output_layer_bo
 
     def one_turn(self, state_bh, input_bte):
