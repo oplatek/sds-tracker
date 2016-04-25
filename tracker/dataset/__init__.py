@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import json
 from collections import Counter
+import random
 
 
 __all__ = ['dstc.Dstc2']
@@ -63,8 +64,15 @@ class Vocabulary:
         self._w2int = dict(((w, i) for i, w in enumerate(tmp)))
         self._int2w = dict(((i, w) for i, w in enumerate(tmp)))
 
-    def get_i(self, w):
-        return self._w2int.get(w, self._w2int[self.unk])
+    def get_i(self, w, unk_chance_smaller=0):
+        if unk_chance_smaller:
+            wc = self._counts[w]
+            if wc <= unk_chance_smaller and wc > random.uniform(0, unk_chance_smaller):
+                return self._w2int[self.unk]
+            else:
+                return self._w2int.get(w, self._w2int[self.unk])
+        else:
+            return self._w2int.get(w, self._w2int[self.unk])
 
     def get_w(self, index):
         return self._int2w[index]

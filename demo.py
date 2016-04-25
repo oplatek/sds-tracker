@@ -3,7 +3,7 @@
 import logging, uuid, random
 import tensorflow as tf
 import numpy as np
-from tracker.utils import Config, git_info
+from tracker.utils import Config, git_info, compare_ref
 from tracker.model import GRUJoint
 from tracker.training import TrainingOps, EarlyStopper
 from tracker.dataset.dstc2 import Dstc2
@@ -32,10 +32,14 @@ c.dropout=1.0
 c.rnn_size=600
 c.nbest_models=3
 c.not_change_limit = 5  # FIXME Be sure that we compare models from different epochs
+c.sample_unk = 3
 
 random.seed(c.seed)
-train_set = Dstc2(c.train_file, first_n=10 * c.batch_size)
-dev_set = Dstc2(c.dev_file, first_n=3 * c.dev_batch_size, turn_len=train_set.turn_len)
+train_set = Dstc2(c.train_file, sample_unk=c.sample_unk)
+dev_set = Dstc2(c.dev_file, 
+        words_vocab=train_set.words_vocab,
+        labels_vocab=train_set.labels_vocab,
+        turn_len=train_set.turn_len)
 
 
 logger.info('Saving automatically generated stats to config')
@@ -72,8 +76,10 @@ try:
     step = 0
     while not coord.should_stop():
         if step % 100 == 0:
-            _, step, loss_val, summ_str = sess.run([t.train_op, t.global_step, m.tr_loss, summarize], feed_dict={m.dropout_keep_prob: c.dropout})
+            _, step, loss_val, tr_inputs, tr_lab, tr_log_val, summ_str = sess.run([t.train_op, t.global_step, m.tr_loss, 
+                m.turn_inputs, m.input_labels, m.tr_logits, summarize], feed_dict={m.dropout_keep_prob: c.dropout})
             logger.debug('Step %7d, Loss: %f', step, loss_val)
+            logger.debug('Step %7d input example:\n%s', step, compare_ref(tr_inputs, tr_lab, tr_log_val, train_set.words_vocab, train_set.labels_vocab))
             summary_writer.add_summary(summ_str, step)
         else:
             _, step = sess.run([t.train_op, t.global_step], feed_dict={m.dropout_keep_prob: c.dropout})
@@ -87,6 +93,10 @@ try:
                     m.feed_turns: turns_val, m.feed_turn_lens: turn_lens_val, m.feed_labels: labels_val}))
                 processed = (i + 1) * c.dev_batch_size
                 logger.debug('Training step: %d, Dev iter: %d, Acc: %f', step, i, true_count / processed)
+
+            dev_logits_val = sess.run(m.dev_logits, feed_dict={m.dropout_keep_prob: 1.0,
+                    m.feed_turns: turns_val, m.feed_turn_lens: turn_lens_val, m.feed_labels: labels_val})
+            logger.debug('Step %7d dev last batch example:\n%s\n', step, compare_ref(turns_val, labels_val, dev_logits_val, train_set.words_vocab, train_set.labels_vocab))
             dev_acc = true_count / processed
             logger.info('Validation Acc: %.4f, Step: %7d', dev_acc, step)
             if not stopper.save_and_check(dev_acc, step, sess):

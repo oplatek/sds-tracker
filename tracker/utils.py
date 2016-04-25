@@ -66,3 +66,13 @@ def git_info():
             'diff': diff or 'Unknown',
             'remote': remote or 'Unknown'}
     return git_dict
+
+def compare_ref(inputs, labels, logits, vocab, labelsdict):
+    res = []
+    pred_idx = np.argmax(logits, axis=1)
+    for i, (lb, pr) in enumerate(zip(labels.tolist(), pred_idx.tolist())):
+        turn =  ' '.join([vocab.get_w(k) for k in inputs[i, :].tolist()])
+        lbs= labelsdict.get_w(lb)
+        prs = labelsdict.get_w(pr)
+        res.extend([turn, lbs, prs])
+    return '\n'.join(res)
