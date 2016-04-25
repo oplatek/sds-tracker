@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Training script for dialogue state tracking.
+
+"""
 import logging, uuid, random
 import tensorflow as tf
 import numpy as np
-from tracker.utils import Config, git_info, compare_ref
+from tracker.utils import Config, git_info, compare_ref, setup_logging
 from tracker.model import GRUJoint
 from tracker.training import TrainingOps, EarlyStopper
 from tracker.dataset.dstc2 import Dstc2
 
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 c = Config()  # FIXME load config from json_file after few commints when everybody knows the settings
 c.name='log/demo_%s' % uuid.uuid1()
@@ -18,13 +19,15 @@ c.train_dir = c.name + '_traindir'
 c.filename = '%s.json' % c.name
 c.vocab_file = '%s.vocab' % c.name
 c.labels_file = '%s.labels' % c.name
+c.log_name = '%s.log' % c.name
 c.seed=123
 c.train_file = './data/dstc2/data.dstc2.train.json'
 c.dev_file = './data/dstc2/data.dstc2.dev.json'
 c.epochs = 2
 c.sys_usr_delim = ' SYS_USR_DELIM '
 c.learning_rate = 0.00005
-c.validate_every = 1000
+c.validate_every = 100000
+c.train_sample_every = 1
 c.batch_size = 2  # FIXME generate batches from train and dev data before training loop
 c.dev_batch_size = 1
 c.embedding_size=200
@@ -34,17 +37,20 @@ c.nbest_models=3
 c.not_change_limit = 5  # FIXME Be sure that we compare models from different epochs
 c.sample_unk = 3
 
+setup_logging(c.log_name)
+logger = logging.getLogger(__name__)
+
 random.seed(c.seed)
 train_set = Dstc2(c.train_file, sample_unk=c.sample_unk)
 dev_set = Dstc2(c.dev_file, 
         words_vocab=train_set.words_vocab,
         labels_vocab=train_set.labels_vocab,
-        turn_len=train_set.turn_len)
+        max_turn_len=train_set.max_turn_len)
 
 
 logger.info('Saving automatically generated stats to config')
 c.git_info = git_info()
-c.max_seq_len = train_set.turn_len
+c.max_seq_len = train_set.max_turn_len
 c.vocab_size = len(train_set.words_vocab)
 c.labels_size = len(train_set.labels_vocab)
 logger.info('Config\n\n: %s\n\n', c)
@@ -75,7 +81,7 @@ threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 try:
     step = 0
     while not coord.should_stop():
-        if step % 100 == 0:
+        if step % c.train_sample_every == 0:
             _, step, loss_val, tr_inputs, tr_lab, tr_log_val, summ_str = sess.run([t.train_op, t.global_step, m.tr_loss, 
                 m.turn_inputs, m.input_labels, m.tr_logits, summarize], feed_dict={m.dropout_keep_prob: c.dropout})
             logger.debug('Step %7d, Loss: %f', step, loss_val)
@@ -88,7 +94,7 @@ try:
             true_count, processed = 0, 0
             devlen, devbs = len(dev_set), c.dev_batch_size  # shortcuts
             for i, (b, e) in enumerate(zip(range(0, devlen, devbs), range(devbs, devlen, devbs))):
-                turns_val, turn_lens_val, labels_val = dev_set.turns[b:e,:], dev_set.turn_lens[b:e], dev_set.labels[b:e]
+                turns_val, turn_lens_val, labels_val = dev_set.turns[b:e, :], dev_set.turn_lens[b:e], dev_set.labels[b:e]
                 true_count += np.sum(sess.run(m.dev_true_count, feed_dict={m.dropout_keep_prob: 1.0,
                     m.feed_turns: turns_val, m.feed_turn_lens: turn_lens_val, m.feed_labels: labels_val}))
                 processed = (i + 1) * c.dev_batch_size

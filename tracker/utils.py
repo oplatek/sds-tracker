@@ -1,24 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from collections import Counter
 import json
 import numpy as np
 import subprocess
+import logging
 
 
-# FIXME rewrite for batch
-def pad(arr, max_len):
-    to_pad = max_len - len(arr)
-    arr = np.array(arr + ([0] * to_pad))
-    arr.shape = (1, max_len)
-    return arr
-
-
-def labels2words(lbl, vocab):
-    lables = []
-    for i in range(lbl.shape[0]):
-        lables.append([vocab.get_w(k) for k in lbl[i, :]])
-    return lables
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -46,8 +34,6 @@ class Config:
         json.dump(self.to_dict(), open(filename, 'w'), indent=4, sort_keys=True)
 
 
-
-
 def git_info():
     head, diff, remote = None, None, None
     try:
@@ -67,12 +53,20 @@ def git_info():
             'remote': remote or 'Unknown'}
     return git_dict
 
+
 def compare_ref(inputs, labels, logits, vocab, labelsdict):
     res = []
     pred_idx = np.argmax(logits, axis=1)
     for i, (lb, pr) in enumerate(zip(labels.tolist(), pred_idx.tolist())):
-        turn =  ' '.join([vocab.get_w(k) for k in inputs[i, :].tolist()])
-        lbs= labelsdict.get_w(lb)
-        prs = labelsdict.get_w(pr)
+        turn = 'turn: ' + ' '.join([vocab.get_w(k) for k in inputs[i, :].tolist()])
+        lbs= 'label: ' + labelsdict.get_w(lb)
+        prs = 'predict: ' + labelsdict.get_w(pr)
         res.extend([turn, lbs, prs])
     return '\n'.join(res)
+
+
+def setup_logging(filename):
+    logging.basicConfig(level=logging.DEBUG, filename=filename)
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    logging.getLogger('').addHandler(console)
