@@ -70,7 +70,7 @@ threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 try:
     step = 0
     while not coord.should_stop():
-        if step % 100:
+        if step % 100 == 0:
             _, step, loss_val, summ_str = sess.run([t.train_op, t.global_step, m.tr_loss, summarize], feed_dict={m.dropout_keep_prob: c.dropout})
             logger.debug('Step %7d, Loss: %f', step, loss_val)
             summary_writer.add_summary(summ_str, step)
