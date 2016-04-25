@@ -35,7 +35,7 @@ c.not_change_limit = 5  # FIXME Be sure that we compare models from different ep
 
 random.seed(c.seed)
 train_set = Dstc2(c.train_file, first_n=10 * c.batch_size)
-dev_set = Dstc2(c.dev_file, first_n=3 * c.dev_batch_size)
+dev_set = Dstc2(c.dev_file, first_n=3 * c.dev_batch_size, turn_len=train_set.turn_len)
 
 
 logger.info('Saving automatically generated stats to config')
@@ -60,6 +60,7 @@ sess.run(m.turn_lengths.initializer, feed_dict={m.turn_len_initialzer: train_set
 sess.run(m.input_labels.initializer, feed_dict={m.labels_initializer: train_set.labels})
 
 stopper = EarlyStopper(c.nbest_models, c.not_change_limit, c.name)
+logger.info('Monitor progress by tensorboard:\ntensorboard --logdir "%s"\n', c.train_dir)
 summary_writer = tf.train.SummaryWriter(c.train_dir, sess.graph)
 summarize = tf.merge_all_summaries()
 
@@ -79,12 +80,12 @@ try:
 
         if step % c.validate_every == 0:
             true_count, processed = 0, 0
-            devlen, devbs = len(dev_set.labels), dev_set.batch_size  # shortcuts
+            devlen, devbs = len(dev_set), c.dev_batch_size  # shortcuts
             for i, (b, e) in enumerate(zip(range(0, devlen, devbs), range(devbs, devlen, devbs))):
-                turns_val, turn_lens_val, labels_val = dev_set.turns[b, e], dev_set.turn_lens[b, e], dev_set.labels[b, e]
+                turns_val, turn_lens_val, labels_val = dev_set.turns[b:e,:], dev_set.turn_lens[b:e], dev_set.labels[b:e]
                 true_count += np.sum(sess.run(m.dev_true_count, feed_dict={m.dropout_keep_prob: 1.0,
                     m.feed_turns: turns_val, m.feed_turn_lens: turn_lens_val, m.feed_labels: labels_val}))
-                processed = i * c.dev_batch_size
+                processed = (i + 1) * c.dev_batch_size
                 logger.debug('Training step: %d, Dev iter: %d, Acc: %f', step, i, true_count / processed)
             dev_acc = true_count / processed
             logger.info('Validation Acc: %.4f, Step: %7d', dev_acc, step)
@@ -93,7 +94,7 @@ try:
 except tf.errors.OutOfRangeError:
     logger.info('Done training interupted by max number of epochs')
 finally:
-    logger.info('Training stopped after %d steps and %f epochs', step, step / len(train_set))
+    logger.info('Training stopped after %7d steps and %7.2f epochs', step, step / len(train_set))
     coord.request_stop()
 coord.join(threads)
 sess.close()
