@@ -63,7 +63,6 @@ class Vocabulary:
         tmp = set(list(self.extra_words) + [w for w, _ in self._counts.most_common(max_items)])
         self._w2int = dict(((w, i) for i, w in enumerate(tmp)))
         self._int2w = dict(((i, w) for i, w in enumerate(tmp)))
-        print(self._w2int, self._int2w)
 
     def get_i(self, w, unk_chance_smaller=0):
         if unk_chance_smaller:
@@ -88,5 +87,4 @@ class Vocabulary:
         json.dump(self.__repr__(), open(filename, 'w'), indent=4, sort_keys=True)
 
     def __len__(self):
-        print('DEBUGGG\n', len(self._w2int), max(self._w2int.values()))
         return len(self._w2int)

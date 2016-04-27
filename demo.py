@@ -97,7 +97,7 @@ try:
             devlen, devbs = len(dev_set), c.dev_batch_size  # shortcuts
             for i, (b, e) in enumerate(zip(range(0, devlen, devbs), range(devbs, devlen, devbs))):  # FIXME omit the last batch
                 dials_val, turn_lens_val, labels_val = dev_set.dialogs[b:e, :], dev_set.turn_lens[b:e], dev_set.labels[b:e]
-                true_count, num_turn = sess.run(m.dev_true_count, m.dev_dial_len, feed_dict={m.dropout_keep_prob: 1.0,
+                true_count, num_turn = sess.run([m.dev_true_count, m.dev_dial_len], feed_dict={m.dropout_keep_prob: 1.0,
                     m.feed_dials: dials_val, m.feed_turn_lens: turn_lens_val, m.feed_labels: labels_val})
                 tot_true_count, tot_num_turn = tot_true_count + true_count, tot_num_turn + num_turn
                 logger.debug('Training step: %d, Dev iter: %d, Batch Acc: %f', step, i, true_count / num_turn)
