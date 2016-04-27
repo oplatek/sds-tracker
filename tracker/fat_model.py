@@ -7,10 +7,6 @@ from tensorflow.python.ops.rnn_cell import GRUCell
 __author__ = 'Petr Belohlavek, Vojtech Hudecek'
 
 
-def broadcast_vector2matrix(vector, batch_size):
-    return tf.tile(tf.expand_dims(vector, 0), [batch_size, 1])
-
-
 class FatModel:
     """
     b = batch size
@@ -33,41 +29,16 @@ class FatModel:
 
         self.gru = GRUCell(self.state_dim)
 
-        # MLP params
-        self.mlp_n_hidden = config.mlp_hidden_layer_dim
-        self.mlp_input2hidden_W = tf.Variable(tf.random_normal([self.state_dim, self.mlp_n_hidden]))
-        self.mlp_input2hidden_B = tf.Variable(tf.random_normal([self.mlp_n_hidden]))
+        embeddings_we = tf.get_variable('word_embeddings', initializer=tf.random_uniform([self.vocab_size, self.emb_dim], -1.0, 1.0))
+        self.emb = embed_input = tf.nn.embedding_lookup(embeddings_we, self.input)
+        inputs = [tf.squeeze(i, squeeze_dims=[1]) for i in tf.split(1, config.max_seq_len, embed_input)]
 
-        self.mlp_hidden2output_W = tf.Variable(tf.random_normal([self.mlp_n_hidden, self.output_dim]))
-        self.mlp_hidden2output_B = tf.Variable(tf.random_normal([self.output_dim]))
+        outputs, last_slu_state = tf.nn.rnn(
+            cell=self.gru,
+            inputs=inputs,
+            dtype=tf.float32,)
 
-        # fun part
-        embeddings_we = tf.random_uniform([self.vocab_size, self.emb_dim])
-        state_bh, logits_o, probability_o = self.one_turn(tf.ones([self.batch_size, self.state_dim]),
-                                                          tf.nn.embedding_lookup(embeddings_we, self.input))
-
-        cost = self.one_cost(logits_o, self.labels)
-
-        # boring part
-        self.loss = cost
-        self.predict = probability_o
-        self.logits = logits_o
-
-    def mlp(self, input_layer_bh):
-        hidden_layer_bm = tf.nn.sigmoid(tf.matmul(input_layer_bh, self.mlp_input2hidden_W) + broadcast_vector2matrix(self.mlp_input2hidden_B, self.batch_size))
-        output_layer_bo = tf.nn.sigmoid(tf.matmul(hidden_layer_bm, self.mlp_hidden2output_W) + broadcast_vector2matrix(self.mlp_hidden2output_B, self.batch_size))
-        return output_layer_bo
-
-    def one_turn(self, state_bh, input_bte):
-        for step in range(self.gru_n_steps):
-            if step > 0:
-                tf.get_variable_scope().reuse_variables()
-            _output, state_bh = self.gru(input_bte[:,step,:], state_bh)
-
-        logits_bo = self.mlp(state_bh)
-        probability_bo = tf.nn.softmax(logits_bo)
-
-        return state_bh, logits_bo, probability_bo
-
-    def one_cost(self, logits_bo, truth_bo):
-        return tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits_bo, truth_bo))
+        w_project = tf.get_variable('project2labels', initializer=tf.random_uniform([self.state_dim, self.output_dim], -1.0, 1.0))
+        self.logits = logits_bo = tf.matmul(last_slu_state, w_project)
+        self.loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits_bo, tf.argmax(self.labels, 1)))
+        self.predict = tf.nn.softmax(logits_bo)
