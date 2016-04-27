@@ -54,10 +54,12 @@ def git_info():
     return git_dict
 
 
-def compare_ref(inputs, labels, logits, vocab, labelsdict):
+def compare_ref(inputs, labels, predictss, vocab, labelsdict):
+    inputs = np.reshape(inputs, (np.prod(inputs.shape[:-1]), inputs.shape[-1]))
+    pred_idx = np.reshape(predictss, (np.prod(predictss.shape),)).tolist()
+    labels = np.reshape(labels, (np.prod(labels.shape),)).tolist()
     res = []
-    pred_idx = np.argmax(logits, axis=1)
-    for i, (lb, pr) in enumerate(zip(labels.tolist(), pred_idx.tolist())):
+    for i, (pr, lb) in enumerate(zip(pred_idx, labels)):
         turn = 'turn: ' + ' '.join([vocab.get_w(k) for k in inputs[i, :].tolist()])
         lbs= 'label: ' + labelsdict.get_w(lb)
         prs = 'predict: ' + labelsdict.get_w(pr)
@@ -68,5 +70,5 @@ def compare_ref(inputs, labels, logits, vocab, labelsdict):
 def setup_logging(filename):
     logging.basicConfig(level=logging.DEBUG, filename=filename)
     console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
+    console.setLevel(logging.DEBUG)
     logging.getLogger('').addHandler(console)
