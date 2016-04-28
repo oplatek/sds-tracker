@@ -33,13 +33,13 @@ class EarlyStopper(object):
 
     def save_and_check(self, measure, step, sess):
         heapq.heappush(self._heap, (measure, step, sess))
-        logger.debug('Adding item (%f, %d, sess)', measure, step)
+        logger.debug('New measure %f from step %d', measure, step)
         if len(self._heap) <= self.n_best:
             self._not_improved = 0
         else:
             pop_measure, pop_step, _ = heapq.heappop(self._heap)
             if pop_measure == measure and pop_step ==step:
-                logger.info('Not keeping (%f, %d, sess)', measure, step)
+                logger.info('Not keeping measure %f from step %d', measure, step)
                 self._not_improved += 1
             else:
                 self._not_improved = 0

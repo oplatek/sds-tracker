@@ -4,7 +4,7 @@
 Training script for dialogue state tracking.
 
 """
-import logging, uuid, random
+import logging, uuid, random, os
 import tensorflow as tf
 from tracker.utils import Config, git_info, compare_ref, setup_logging
 from tracker.model import GRUJoint
@@ -13,7 +13,7 @@ from tracker.dataset.dstc2 import Dstc2
 
 
 c = Config()  # FIXME load config from json_file after few commints when everybody knows the settings
-c.name='log/demo_%s' % uuid.uuid1()
+c.name='log/%(u)s/%(u)s' % {'u': uuid.uuid1()}
 c.train_dir = c.name + '_traindir'
 c.filename = '%s.json' % c.name
 c.vocab_file = '%s.vocab' % c.name
@@ -36,6 +36,7 @@ c.nbest_models=3
 c.not_change_limit = 5  # FIXME Be sure that we compare models from different epochs
 c.sample_unk = 3
 
+os.makedirs(os.path.dirname(c.name), exist_ok=True)
 setup_logging(c.log_name)
 logger = logging.getLogger(__name__)
 
