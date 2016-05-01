@@ -12,7 +12,7 @@ class TrainingOps(object):
     def __init__(self, loss, optimizer):
         self.optimizer = optimizer
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
-        tf.scalar_summary(loss.op.name, loss)
+        tf.scalar_summary(loss.op.name + 'loss', loss)
         self.train_op = self.optimizer.minimize(loss, global_step=self.global_step)
 
 

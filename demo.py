@@ -25,8 +25,8 @@ c.dev_file = './data/dstc2/data.dstc2.dev.json'
 c.epochs = 2
 c.sys_usr_delim = ' SYS_USR_DELIM '
 c.learning_rate = 0.00005
-c.validate_every = 1
-c.train_sample_every = 1
+c.validate_every = 200
+c.train_sample_every = 200
 c.batch_size = 2
 c.dev_batch_size = 1
 c.embedding_size=200
@@ -34,7 +34,7 @@ c.dropout=1.0
 c.rnn_size=600
 c.nbest_models=3
 c.not_change_limit = 5  # FIXME Be sure that we compare models from different epochs
-c.sample_unk = 3
+c.sample_unk = 0
 
 os.makedirs(os.path.dirname(c.name), exist_ok=True)
 setup_logging(c.log_name)
@@ -98,7 +98,7 @@ try:
             devlen, devbs = len(dev_set), c.dev_batch_size  # shortcuts
             for i, (b, e) in enumerate(zip(range(0, devlen, devbs), range(devbs, devlen, devbs))):  # FIXME omit the last batch
                 dials_val, turn_lens_val, labels_val = dev_set.dialogs[b:e, :], dev_set.turn_lens[b:e], dev_set.labels[b:e]
-                true_count, num_turn = sess.run([m.dev_true_count, m.dev_dial_len], feed_dict={m.dropout_keep_prob: 1.0,
+                true_count, num_turn = sess.run([m.dev_true_count, m.dev_num_turms], feed_dict={m.dropout_keep_prob: 1.0,
                     m.feed_dials: dials_val, m.feed_turn_lens: turn_lens_val, m.feed_labels: labels_val})
                 tot_true_count, tot_num_turn = tot_true_count + true_count, tot_num_turn + num_turn
                 logger.debug('Training step: %d, Dev iter: %d, Batch Acc: %f', step, i, true_count / num_turn)

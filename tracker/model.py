@@ -35,12 +35,12 @@ class GRUJoint():
             assert labels.get_shape() == [c.batch_size, c.max_dial_len], str(labels.get_shape() == [c.batch_size, c.max_dial_len])
 
             with tf.variable_scope('graph') as graph_scope:
-                self.tr_predictss, self.tr_loss, self.tr_dial_len, self.tr_true_count, batch_acc = self.__class__._build_graph(
+                self.tr_predictss, self.tr_loss, self.tr_num_turms, self.tr_true_count, batch_acc = self.__class__._build_graph(
                         dialogs, turn_lens, labels, self.dropout_keep_prob, c)
-                # tf.scalar_summary('train/loss', self.tr_loss)
-                # tf.scalar_summary('train/batch_accuracy', batch_acc)
-                # tf.scalar_summary('train/true_count', self.tr_true_count)
-                # tf.scalar_summary('train/dial_len', self.tr_dial_len)
+                tf.scalar_summary('train/loss', self.tr_loss)
+                tf.scalar_summary('train/batch_accuracy', batch_acc)
+                tf.scalar_summary('train/true_count', self.tr_true_count)
+                tf.scalar_summary('train/num_turns', self.tr_num_turms)
 
         with tf.variable_scope('dev_input'):
             self.feed_dials = dialogs =tf.placeholder(shape=[c.dev_batch_size, c.max_dial_len, c.max_turn_len], dtype=tf.int64)
@@ -48,12 +48,8 @@ class GRUJoint():
             self.feed_turn_lens = turn_lens = tf.placeholder(shape=[c.dev_batch_size, c.max_dial_len], dtype=tf.int64)
             # reusing the same parameters from the graph where are trained
             with tf.variable_scope(graph_scope, reuse=True):
-                self.dev_predictss, self.dev_loss, self.dev_dial_len, self.dev_true_count, batch_acc = self.__class__._build_graph(
+                self.dev_predictss, self.dev_loss, self.dev_num_turms, self.dev_true_count, batch_acc = self.__class__._build_graph(
                         dialogs, turn_lens, labels, self.dropout_keep_prob, c)
-                # tf.scalar_summary('dev/loss', self.dev_loss)
-                # tf.scalar_summary('dev/batch_accuracy', batch_acc)
-                # tf.scalar_summary('dev/true_count', self.dev_true_count)
-                # tf.scalar_summary('dev/dial_len', self.dev_dial_len)
         logger.info('Loaded time %s', time.time() - start)
 
     @staticmethod
@@ -117,7 +113,8 @@ class GRUJoint():
         with tf.variable_scope('eval'):
             predicts = tf.argmax(masked_logits, 1)
             true_count = tf.reduce_sum(tf.to_int64(tf.equal(predicts, labels_vec)) * tf.reshape(masked_turns, [-1]))
-            batch_accuracy = tf.div(true_count, tf.reduce_sum(dial_len))
+            num_turns = tf.reduce_sum(dial_len)
+            batch_accuracy = tf.div(tf.to_floa(true_count), tf.to_float(num_turns))
             logger.debug('true_count.get_shape(): %s', true_count.get_shape())
         logger.info('trainable variables: %s', '\n'.join([str((v.name, v.get_shape())) for v in tf.trainable_variables()]))
-        return (predicts, loss, dial_len, true_count, batch_accuracy)
+        return (predicts, loss, num_turns, true_count, batch_accuracy)
