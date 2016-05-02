@@ -31,6 +31,7 @@ if __name__ == '__main__':
     assert input_val.shape[0] == labels_val.shape[0]
 
     c = Config()
+    c.log_dir = 'log/'
     c.seed = 123
     c.epochs = 200
     c.learning_rate = 0.005
@@ -42,7 +43,6 @@ if __name__ == '__main__':
     c.max_seq_len = input_val.shape[1]
     c.embedding_dim = 10
     c.hidden_state_dim = 50
-    c.mlp_hidden_layer_dim = 15
 
     # Fun part
     logger.info('Creating model')
@@ -59,7 +59,8 @@ if __name__ == '__main__':
     logger.info('Run init')
     sess.run(init)
 
-    train_writer = tf.train.SummaryWriter('log/', sess.graph)
+    logger.info('See stats via tensorboard\n\ntensorboard --logdir %s\n\n', c.log_dir)
+    train_writer = tf.train.SummaryWriter(c.log_dir, sess.graph)
 
     # Training part
     epoch_loss = 0
