@@ -1,24 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from collections import Counter
 import json
 import numpy as np
 import subprocess
+import logging
 
 
-# FIXME rewrite for batch
-def pad(arr, max_len):
-    to_pad = max_len - len(arr)
-    arr = np.array(arr + ([0] * to_pad))
-    arr.shape = (1, max_len)
-    return arr
-
-
-def labels2words(lbl, vocab):
-    lables = []
-    for i in range(lbl.shape[0]):
-        lables.append([vocab.get_w(k) for k in lbl[i, :]])
-    return lables
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -46,41 +34,6 @@ class Config:
         json.dump(self.to_dict(), open(filename, 'w'), indent=4, sort_keys=True)
 
 
-class Vocabulary:
-    @classmethod
-    def load_json(cls, filename):
-        d = json.load(open(filename, 'r'))
-        return cls(**d)
-
-    def __init__(self, counts, max_items=5000, extra_words=None, unk='UNK'):
-        self._counts = counts if isinstance(counts, Counter) else Counter(counts)
-        self.extra_words = set(extra_words or [])
-        self.extra_words.add(unk)
-        self.unk = unk
-        self.max_items = max_items
-        tmp = list(self.extra_words) + [w for w, _ in self._counts.most_common(max_items)]
-        self._w2int = dict(((w, i) for i, w in enumerate(tmp)))
-        self._int2w = dict(((i, w) for i, w in enumerate(tmp)))
-
-    def get_i(self, w):
-        return self._w2int.get(w, self._w2int[self.unk])
-
-    def get_w(self, index):
-        return self._int2w[index]
-
-    def __repr__(self):
-        return {'counts': self._counts,
-                'max_items': self.max_items,
-                'unk': self.unk,
-                'extra_words': list(self.extra_words)}
-
-    def save(self, filename):
-        json.dump(self.__repr__(), open(filename, 'w'), indent=4, sort_keys=True)
-
-    def __len__(self):
-        return len(self._w2int)
-
-
 def git_info():
     head, diff, remote = None, None, None
     try:
@@ -99,3 +52,23 @@ def git_info():
             'diff': diff or 'Unknown',
             'remote': remote or 'Unknown'}
     return git_dict
+
+
+def compare_ref(inputs, labels, predictss, vocab, labelsdict):
+    inputs = np.reshape(inputs, (np.prod(inputs.shape[:-1]), inputs.shape[-1]))
+    pred_idx = np.reshape(predictss, (np.prod(predictss.shape),)).tolist()
+    labels = np.reshape(labels, (np.prod(labels.shape),)).tolist()
+    res = []
+    for i, (pr, lb) in enumerate(zip(pred_idx, labels)):
+        turn = 'turn: ' + ' '.join([vocab.get_w(k) for k in inputs[i, :].tolist()])
+        lbs= 'label: ' + labelsdict.get_w(lb)
+        prs = 'predict: ' + labelsdict.get_w(pr)
+        res.extend([turn, lbs, prs])
+    return '\n'.join(res)
+
+
+def setup_logging(filename):
+    logging.basicConfig(level=logging.DEBUG, filename=filename)
+    console = logging.StreamHandler()
+    console.setLevel(logging.DEBUG)
+    logging.getLogger('').addHandler(console)
