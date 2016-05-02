@@ -10,38 +10,95 @@ import tensorflow as tf
 from tracker.utils import Config
 from tracker.fat_model import FatModel
 
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Training script for dialogue state tracking.
+
+"""
+import logging, uuid, random, os
+import tensorflow as tf
+from tracker.utils import Config, git_info, compare_ref, setup_logging
+from tracker.model import GRUJoint
+from tracker.training import TrainingOps, EarlyStopper
+from tracker.dataset.dstc2 import Dstc2
+
 __author__ = 'Petr Belohlavek, Vojtech Hudecek'
 
 
+def generateTurn(train_set):
+    for i, dialog in enumerate(train_set.dialogs):
+        for j, turn in enumerate(dialog):
+            # turn[:train_set.turn_lens[i, j]]
+            yield turn[:], train_set.labels[i, j]
+
 if __name__ == '__main__':
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
+    c = Config()  # FIXME load config from json_file after few commints when everybody knows the settings
+    c.name='log/%(u)s/%(u)s' % {'u': uuid.uuid1()}
+    c.train_dir = c.name + '_traindir'
+    c.filename = '%s.json' % c.name
+    c.vocab_file = '%s.vocab' % c.name
+    c.labels_file = '%s.labels' % c.name
+    c.log_name = '%s.log' % c.name
+    c.seed=123
+    c.train_file = './data/dstc2/data.dstc2.train.json'
+    c.dev_file = './data/dstc2/data.dstc2.dev.json'
+    c.epochs = 2
+    c.sys_usr_delim = ' SYS_USR_DELIM '
+    c.learning_rate = 0.00005
+    c.validate_every = 200
+    c.train_sample_every = 200
+    c.batch_size = 2
+    c.dev_batch_size = 1
+    c.embedding_size=200
+    c.dropout=1.0
+    c.rnn_size=600
+    c.nbest_models=3
+    c.not_change_limit = 5  # FIXME Be sure that we compare models from different epochs
+    c.sample_unk = 0
+
+    os.makedirs(os.path.dirname(c.name), exist_ok=True)
+    setup_logging(c.log_name)
+    logger = logging.getLogger(__name__)
+
+    random.seed(c.seed)
+    train_set = Dstc2(c.train_file, sample_unk=c.sample_unk, first_n=2 * c.batch_size)
+    dev_set = Dstc2(c.dev_file,
+            words_vocab=train_set.words_vocab,
+            labels_vocab=train_set.labels_vocab,
+            max_dial_len=train_set.max_dial_len,
+            max_turn_len=train_set.max_turn_len,
+            first_n=2 * c.dev_batch_size)
+
+
+    logger.info('Saving automatically generated stats to config')
+    c.git_info = git_info()
+    c.max_turn_len = train_set.max_turn_len
+    c.max_dial_len = train_set.max_dial_len
+    c.vocab_size = len(train_set.words_vocab)
+    c.labels_size = len(train_set.labels_vocab)
+    logger.info('Config\n\n: %s\n\n', c)
+    logger.info('Saving helper files')
+
+
     # Don't forget to install bleeding-edge TF version
     # sudo pip3 install http://ci.tensorflow.org/view/Nightly/job/nightly-matrix-cpu/TF_BUILD_CONTAINER_TYPE\=CPU,TF_BUILD_IS_OPT\=OPT,TF_BUILD_IS_PIP\=PIP,TF_BUILD_PYTHON_VERSION\=PYTHON3,label\=cpu-slave/lastSuccessfulBuild/artifact/pip_test/whl/tensorflow-0.8.0rc0-cp34-cp34m-linux_x86_64.wh
     # See Installation for other versions https://github.com/tensorflow/tensorflow/blob/master/README.md
 
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
     logger = logging.getLogger(__name__)
 
-    input_val = np.array([[1, 2, 2, 4],
-                          [1, 3, 3, 4],
-                          [1, 0, 0, 4]], dtype='int32')
-    # labels_val = np.array([[1, 0, 0],
-    #                        [0, 1, 0]], dtype='float32')
-    labels_val = np.array([0, 1, 2], dtype='int64')
-
-    assert input_val.shape[0] == labels_val.shape[0]
-
-    c = Config()
     c.log_dir = 'log/'
     c.seed = 123
     c.epochs = 200
     c.learning_rate = 0.005
     random.seed(c.seed)
 
-    c.vocab_size = np.max(input_val) + 1
-    c.batch_size = labels_val.shape[0]
-    c.output_dim = np.max(labels_val) + 1
-    c.max_seq_len = input_val.shape[1]
-    c.embedding_dim = 10
+    c.batch_size = 1
+    c.vocab_size = len(train_set.words_vocab)
+    c.output_dim = len(train_set._lab_vocab) + 1
+    c.max_seq_len = train_set._max_turn_len
+    c.embedding_dim = 20
     c.hidden_state_dim = 50
 
     # Fun part
@@ -66,16 +123,17 @@ if __name__ == '__main__':
     epoch_loss = 0
     train_summary = None
     for e in range(c.epochs):
-        skipped_dial = 0
-        for step in range(100):
-            _, epoch_loss, train_summary= sess.run([train_op, m.loss, m.tb_info], feed_dict={m.input: input_val, m.labels: labels_val})
+        for turn, label in generateTurn(train_set):
+            _, epoch_loss, train_summary= sess.run([train_op, m.loss, m.tb_info], feed_dict={m.input: [turn], m.labels: [label]})
             # epoch_loss = loss
         train_writer.add_summary(train_summary, e)
 
         logger.debug('Average Batch Loss @%d = %f', e, epoch_loss)
-        results = sess.run([m.probabilities, m.logits, m.predict, m.accuracy],
-                           feed_dict={m.input: input_val, m.labels: labels_val})
-        logging.debug('Probs:\n%s', results[0])
-        logging.debug('Logits:\n%s', results[1])
-        logging.debug('Predict:\n%s', results[2])
-        logging.debug('Accuracy:\n%s', results[3])
+        # results = sess.run([m.probabilities, m.logits, m.predict, m.accuracy],
+        #                    feed_dict={m.input: inp, m.labels: labels_val})
+        # logging.debug('Probs:\n%s', results[0])
+        # logging.debug('Logits:\n%s', results[1])
+        # logging.debug('Predict:\n%s', results[2])
+        # logging.debug('Accuracy:\n%s', results[3])
+
+
