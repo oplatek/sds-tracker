@@ -52,3 +52,25 @@
 # with tf.Session() as sess:
 #     sess.run(tf.initialize_all_variables())
 #     print(sess.run(out))
+############################################################
+from __future__ import division, print_function
+import tensorflow as tf
+from tensorflow.python.ops import functional_ops
+
+
+def fn(previous_output, a, b):
+    return previous_output + a*b
+
+A = tf.Variable([1.0, 2.0, 3.0])
+B = tf.Variable([1.0, -2.0, 5.0])
+A = tf.identity(A)
+B = tf.identity(B)
+
+initA = tf.constant(0.0)
+initB = tf.constant(0.0)
+
+out = functional_ops.scan(fn, tf.identity([A,B]), initializer=tf.identity([initA, initB]))
+
+with tf.Session() as sess:
+    sess.run(tf.initialize_all_variables())
+    print(sess.run(out))

@@ -39,7 +39,7 @@ if __name__ == '__main__':
     c.train_dir = c.name + '_traindir'
     c.filename = '%s.json' % c.name
     c.vocab_file = '%s.vocab' % c.name
-    c.labels_file = '%s.labels' % c.name
+    c.labels_file = '%s.labels_bd' % c.name
     c.log_name = '%s.log' % c.name
     c.seed=123
     c.train_file = './data/dstc2/data.dstc2.train.json'
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     c.learning_rate = 0.00005
     c.validate_every = 200
     c.train_sample_every = 200
-    c.batch_size = 2
+    c.batch_size = 1
     c.dev_batch_size = 1
     c.embedding_size=200
     c.dropout=1.0
@@ -90,7 +90,7 @@ if __name__ == '__main__':
 
     c.log_dir = 'log/'
     c.seed = 123
-    c.epochs = 200
+    c.epochs = 100
     c.learning_rate = 0.005
     random.seed(c.seed)
 
@@ -98,8 +98,9 @@ if __name__ == '__main__':
     c.vocab_size = len(train_set.words_vocab)
     c.output_dim = len(train_set._lab_vocab) + 1
     c.max_seq_len = train_set._max_turn_len
-    c.embedding_dim = 20
-    c.hidden_state_dim = 50
+    c.max_dialog_len = train_set.max_dial_len
+    c.embedding_dim = 120
+    c.hidden_state_dim = 100
 
     # Fun part
     logger.info('Creating model')
@@ -123,14 +124,18 @@ if __name__ == '__main__':
     epoch_loss = 0
     train_summary = None
     for e in range(c.epochs):
-        for turn, label in generateTurn(train_set):
-            _, epoch_loss, train_summary= sess.run([train_op, m.loss, m.tb_info], feed_dict={m.input: [turn], m.labels: [label]})
+        for dialog, labels in zip(train_set.dialogs, train_set.labels):
+            _, epoch_loss, train_summary = sess.run([train_op, m.loss, m.tb_info], feed_dict={m.input_bdt: [dialog],
+                                                                                              m.labels_bd: [labels]})
             # epoch_loss = loss
+        # for turn, label in generateTurn(train_set):
+        #     _, epoch_loss, train_summary = sess.run([train_op, m.loss, m.tb_info], feed_dict={m.input_bdt: [turn], m.labels_bd: [label]})
+        #     # epoch_loss = loss
         train_writer.add_summary(train_summary, e)
 
         logger.debug('Average Batch Loss @%d = %f', e, epoch_loss)
         # results = sess.run([m.probabilities, m.logits, m.predict, m.accuracy],
-        #                    feed_dict={m.input: inp, m.labels: labels_val})
+        #                    feed_dict={m.input_bdt: inp, m.labels_bd: labels_val})
         # logging.debug('Probs:\n%s', results[0])
         # logging.debug('Logits:\n%s', results[1])
         # logging.debug('Predict:\n%s', results[2])
