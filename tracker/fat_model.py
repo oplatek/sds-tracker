@@ -3,7 +3,6 @@
 
 import tensorflow as tf
 from tensorflow.python.ops.rnn_cell import GRUCell
-from tensorflow.python.ops.functional_ops import scan
 __author__ = 'Petr Belohlavek, Vojtech Hudecek'
 
 

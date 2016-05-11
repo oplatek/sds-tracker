@@ -98,8 +98,8 @@ if __name__ == '__main__':
     c.vocab_size = len(train_set.words_vocab)
     c.output_dim = len(train_set._lab_vocab) + 1
     c.max_seq_len = train_set._max_turn_len
-    c.embedding_dim = 20
-    c.hidden_state_dim = 50
+    c.embedding_dim = 300
+    c.hidden_state_dim = 250
 
     # Fun part
     logger.info('Creating model')
