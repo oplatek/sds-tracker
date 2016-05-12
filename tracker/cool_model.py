@@ -4,7 +4,6 @@ from tensorflow.python.ops.functional_ops import scan
 from tensorflow.python.ops.control_flow_ops import cond
 
 import numpy as np
-import pandas as pd
 import logging
 
 from tracker.dataset.dstc2 import Dstc2
@@ -32,7 +31,7 @@ def main():
     log_dir = 'log'
 
     # Data ---------------------------------------------------------------------------------------------------
-    train_set = Dstc2('../data/dstc2/data.dstc2.train.json', sample_unk=0, first_n=2 * batch_size)
+    train_set = Dstc2('data/dstc2/data.dstc2.train.json', sample_unk=0, first_n=2 * batch_size)
     vocab_size = len(train_set.words_vocab)
     output_dim = max(np.unique(train_set.labels)) + 1
     n_train_batches = len(train_set.dialogs) // batch_size
@@ -51,7 +50,7 @@ def main():
     gru = GRUCell(hidden_state_dim)
     embeddings_we = tf.get_variable('word_embeddings', initializer=tf.random_uniform([vocab_size, embedding_dim], -1.0, 1.0))
     embedded_input_bte = tf.nn.embedding_lookup(embeddings_we, input_bt)
-    dialog_state_before_turn = tf.get_variable('dialog_state_before_turn', initializer=tf.zeros([batch_size, hidden_state_dim], dtype='float32'))
+    dialog_state_before_turn = tf.get_variable('dialog_state_before_turn', initializer=tf.zeros([batch_size, hidden_state_dim], dtype='float32'), trainable=False)
 
     before_state_bh = cond(is_first_turn,
         lambda: gru.zero_state(batch_size, dtype='float32'),
@@ -66,7 +65,6 @@ def main():
 
     projection_ho = tf.get_variable('project2labels',
                                     initializer=tf.random_uniform([hidden_state_dim, output_dim], -1.0, 1.0))
-
 
     logits_bo = tf.matmul(state_bh, projection_ho)
     tf.histogram_summary('logits', logits_bo)
@@ -126,6 +124,6 @@ def main():
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
     logging.getLogger("tensorflow").setLevel(logging.WARNING)
-    logging.info('Start')
+    logging.info('Start the script from parent directory by running "python tracker/cool_model.py')
     main()
     logging.info('Finished')
