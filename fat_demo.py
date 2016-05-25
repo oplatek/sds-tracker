@@ -1,17 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import numpy as np
-import logging
-import random
-
-import tensorflow as tf
-
-from tracker.utils import Config
-from tracker.fat_model import FatModel
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Training script for dialogue state tracking.
 
@@ -22,6 +11,7 @@ from tracker.utils import Config, git_info, compare_ref, setup_logging
 from tracker.model import GRUJoint
 from tracker.training import TrainingOps, EarlyStopper
 from tracker.dataset.dstc2 import Dstc2
+from tracker.fat_model import FatModel
 
 __author__ = 'Petr Belohlavek, Vojtech Hudecek'
 
@@ -99,8 +89,9 @@ if __name__ == '__main__':
     c.output_dim = len(train_set._lab_vocab) + 1
     c.max_seq_len = train_set._max_turn_len
     c.max_dialog_len = train_set.max_dial_len
-    c.embedding_dim = 120
     c.hidden_state_dim = 100
+    c.embedding_dim = 300
+    c.hidden_state_dim = 250
 
     # Fun part
     logger.info('Creating model')
