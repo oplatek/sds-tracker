@@ -23,6 +23,27 @@ def next_batch(train_set, batch_size):
         yield (dlg, lengths, labels, mask)
 
 
+def stats(train, valid, test):
+    logging.info('Stats ===============')
+    logging.info('Train classes: %d', np.max(train.labels))
+    logging.info('Valid classes: %d', np.max(valid.labels))
+    logging.info('Test classes: %d', np.max(test.labels))
+
+    train_dist = np.bincount(np.array(train.labels).flatten())
+    train_argmax = np.argmax(train_dist)
+    logging.info('Train most frequent class: %d (%f)', train_argmax, train_dist[train_argmax]/float(len(train.labels)))
+
+    valid_dist = np.bincount(np.array(valid.labels).flatten())
+    valid_argmax = np.argmax(valid_dist)
+    logging.info('Valid most frequent class: %d (%f)', valid_argmax, valid_dist[valid_argmax]/float(len(valid.labels)))
+
+    test_dist = np.bincount(np.array(test.labels).flatten())
+    test_argmax = np.argmax(test_dist)
+    logging.info('Test most frequent class: %d (%f)', test_argmax, test_dist[test_argmax]/float(len(test.labels)))
+
+    logging.info('/Stats ===============')
+
+
 def main():
     # Config -----------------------------------------------------------------------------------------------------
     learning_rate = 0.005
@@ -41,6 +62,8 @@ def main():
     test_set = Dstc2('../data/dstc2/data.dstc2.test.json', first_n=data_portion, sample_unk=0,
                      max_dial_len=train_set.max_dial_len, words_vocab=train_set.words_vocab,
                      labels_vocab=train_set.labels_vocab)
+
+    stats(train_set, valid_set, test_set)
 
     vocab_size = len(train_set.words_vocab)
     output_dim = max(np.unique(train_set.labels)) + 1
