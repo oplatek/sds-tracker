@@ -16,8 +16,12 @@ class Dstc2(TurnTrackerSet):
         delim = self.__class__.sys_usr_delim
         self._raw_data = raw_data = json.load(open(filename))
         self._first_n = min(first_n, len(raw_data)) if first_n else len(raw_data)
-        dialogs = [[(turn[0] + ' %s ' % delim + turn[1]).split() for turn in dialog] for dialog in raw_data]
-        labels = [[turn[4] for turn in dialog] for dialog in raw_data]
+        if max_dial_len != None:
+            dialogs = [[(turn[0] + ' %s ' % delim + turn[1]).split() for turn in dialog] for dialog in raw_data if len(dialog) <= max_dial_len]
+            labels = [[turn[4] for turn in dialog] for dialog in raw_data if len(dialog) <= max_dial_len]
+        else:
+            dialogs = [[(turn[0] + ' %s ' % delim + turn[1]).split() for turn in dialog] for dialog in raw_data]
+            labels = [[turn[4] for turn in dialog] for dialog in raw_data]
         assert len(dialogs) == len(labels), '%s vs %s' % (dialogs, labels)
 
         dialogs, labels = dialogs[:first_n], labels[:first_n]
@@ -36,6 +40,11 @@ class Dstc2(TurnTrackerSet):
 
         self._turn_lens_per_dialog = np.zeros((len(dialogs), mdl), dtype=np.int64)
         self._dials = np.zeros((len(dialogs), mdl, mtl), dtype=np.int64)
+        self._dial_lens = np.array([len(d) for d in dialogs], dtype=np.int64)
+
+        self._dial_mask = np.zeros((len(self._dials), self._max_dial_len), dtype=np.int64)
+        for i, l in enumerate(self._dial_lens):
+            self._dial_mask[i, :l] = np.ones((l,), dtype=np.int64)
 
         for i, d in enumerate(dialogs):
             for j, t in enumerate(d):
@@ -57,6 +66,10 @@ class Dstc2(TurnTrackerSet):
         return self._first_n
 
     @property
+    def dial_mask(self):
+        return self._dial_mask
+
+    @property
     def dialogs(self):
         '''Returns np.array with shape [ # dialogs, max_dial_len, max_turn_len]'''
         return self._dials
@@ -75,6 +88,12 @@ class Dstc2(TurnTrackerSet):
     def labels_vocab(self):
         return self._lab_vocab
 
+    @property
+    def dial_lens(self):
+        '''
+        :return: np.array with shape [#dialogs]
+        '''
+        return self._dial_lens
     @property
     def turn_lens(self):
         '''Returns np.array with shape [ # dialogs, max_dialog_len]'''
