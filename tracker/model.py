@@ -92,7 +92,7 @@ class GRUJoint():
             with tf.variable_scope('slot_prediction', reuse=True if t > 0 else None):
                 # FIXME better initialization
                 w_project = tf.get_variable('project2labels', 
-                        initializer=tf.random_uniform([c.rnn_size, c.labels_size], -1.0, 1.0))  # FIXME dynamically change size based on the input not used fixed c.rnn_size
+                        initializer=tf.random_uniform([c.rnn_size, c.labels_size], -1.0, 1.0))  # FIXME dynamically change size based on the input_bdt not used fixed c.rnn_size
                 logitss[t] = tf.matmul(dialog_states[t], w_project)
 
         logger.debug('dialog_states[0].get_shape(): %s', dialog_states[0].get_shape())
@@ -102,7 +102,7 @@ class GRUJoint():
         logger.debug('logits.get_shape(): %s', logits.get_shape())
 
         with tf.variable_scope('loss'):
-            logger.debug('labels.get_shape(): %s', labels.get_shape())
+            logger.debug('labels_bd.get_shape(): %s', labels.get_shape())
             masked_logits = tf.mul(logits, tf.reshape(masked_turnsf, (np.prod(masked_turnsf.get_shape().as_list()), 1)))
             logger.debug('masked_logits.get_shape(): %s, masked_logits.dtype %s', masked_logits.get_shape(), masked_logits.dtype)
             labels_vec = tf.reshape(labels, [-1])

@@ -17,7 +17,7 @@ class TurnTrackerSet(object):
     def turns(self):
         '''
         Returns list of fixed lenght numpy arrays encoding the
-        input of a turn.
+        input_bdt of a turn.
         Content of the numpy arrays are integers representing words.
         We suggest to padd the not used values with zeros.
         '''
@@ -33,7 +33,7 @@ class TurnTrackerSet(object):
     @property
     def labels(self):
         '''
-        Returns list labels
+        Returns list labels_bd
         '''
         raise NotImplementedError('Implement in derived class!')
 
@@ -44,7 +44,7 @@ class TurnTrackerSet(object):
 
     @property 
     def labels_vocab(self):
-        '''Returns Vocabulary for predicted labels'''
+        '''Returns Vocabulary for predicted labels_bd'''
         raise NotImplementedError('Implement in derived class!')
 
 

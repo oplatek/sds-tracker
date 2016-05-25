@@ -17,7 +17,7 @@ c.name='log/%(u)s/%(u)s' % {'u': uuid.uuid1()}
 c.train_dir = c.name + '_traindir'
 c.filename = '%s.json' % c.name
 c.vocab_file = '%s.vocab' % c.name
-c.labels_file = '%s.labels' % c.name
+c.labels_file = '%s.labels_bd' % c.name
 c.log_name = '%s.log' % c.name
 c.seed=123
 c.train_file = './data/dstc2/data.dstc2.train.json'
@@ -88,7 +88,7 @@ try:
             _, step, loss_val, tr_inputs, tr_lab, tr_pred_val, summ_str = sess.run([t.train_op, t.global_step, m.tr_loss, 
                 m.turn_inputs, m.input_labels, m.tr_predictss, summarize], feed_dict={m.dropout_keep_prob: c.dropout})
             logger.debug('Step %7d, Loss: %f', step, loss_val)
-            logger.debug('Step %7d input example:\n%s', step, compare_ref(tr_inputs, tr_lab, tr_pred_val, train_set.words_vocab, train_set.labels_vocab))
+            logger.debug('Step %7d input_bdt example:\n%s', step, compare_ref(tr_inputs, tr_lab, tr_pred_val, train_set.words_vocab, train_set.labels_vocab))
             summary_writer.add_summary(summ_str, step)
         else:
             _, step = sess.run([t.train_op, t.global_step], feed_dict={m.dropout_keep_prob: c.dropout})
