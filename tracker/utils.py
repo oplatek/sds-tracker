@@ -67,8 +67,10 @@ def compare_ref(inputs, labels, predictss, vocab, labelsdict):
     return '\n'.join(res)
 
 
-def setup_logging(filename):
-    logging.basicConfig(level=logging.DEBUG, filename=filename)
+def setup_logging(filename, console_level=logging.INFO):
+    logging.basicConfig(format='%(asctime)s:%(levelname)s: %(message)s', level=logging.DEBUG, filename=filename)
+    if isinstance(console_level, str):
+        console_level = logging.getLevelName(console_level)
     console = logging.StreamHandler()
-    console.setLevel(logging.DEBUG)
+    console.setLevel(console_level)
     logging.getLogger('').addHandler(console)

@@ -1,13 +1,15 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import tensorflow as tf
 from tensorflow.python.ops.rnn_cell import GRUCell
 from tensorflow.python.ops.control_flow_ops import cond
 from tensorflow.python.ops.nn_ops import softmax_cross_entropy_with_logits as x_entropy
 import numpy as np
-import logging
-import random
-
+from datetime import datetime
+import logging, random, argparse, os
 
 from tracker.dataset.dstc2 import Dstc2
+from tracker.utils import setup_logging
 
 __author__ = '{Petr Belohlavek, Vojtech Hudecek, Josef Valek and Ondrej Platek}'
 seed = 123
@@ -49,14 +51,10 @@ def stats(train, valid, test):
     logging.info('/Stats ===============')
 
 
-def main():
-    # Config -----------------------------------------------------------------------------------------------------
-    learning_rate = 0.005
-    batch_size = 16
-    epochs = 50
-    hidden_state_dim = 200
-    embedding_dim = 300
-    log_dir = 'log'
+def main(c):
+    ''' params:
+            c: config dictionary
+    '''
 
     # Data ---------------------------------------------------------------------------------------------------
     data_portion = None  # 2 * batch_size
@@ -72,31 +70,31 @@ def main():
 
     vocab_size = len(train_set.words_vocab)
     output_dim = max(np.unique(train_set.labels)) + 1
-    n_train_batches = len(train_set.dialogs) // batch_size
+    n_train_batches = len(train_set.dialogs) // c.batch_size
 
     # Model -----------------------------------------------------------------------------------------------------
     logging.info('Creating model')
-    input_bt = tf.placeholder('int32', [batch_size, train_set.max_turn_len], name='input')
-    turn_lens_b = tf.placeholder('int32', [batch_size], name='turn_lens')
-    mask_b = tf.placeholder('int32', [batch_size], name='dial_mask')
-    labels_b = tf.placeholder('int64', [batch_size], name='labels')
+    input_bt = tf.placeholder('int32', [c.batch_size, train_set.max_turn_len], name='input')
+    turn_lens_b = tf.placeholder('int32', [c.batch_size], name='turn_lens')
+    mask_b = tf.placeholder('int32', [c.batch_size], name='dial_mask')
+    labels_b = tf.placeholder('int64', [c.batch_size], name='labels')
     onehot_labels_bo = tf.one_hot(indices=labels_b,
                                   depth=output_dim,
                                   on_value=1.0,
                                   off_value=0.0,
                                   axis=-1)
     is_first_turn = tf.placeholder(tf.bool)
-    gru = GRUCell(hidden_state_dim)
+    gru = GRUCell(c.hidden_state_dim)
 
     embeddings_we = tf.get_variable('word_embeddings',
-                                    initializer=tf.random_uniform([vocab_size, embedding_dim], -1.0, 1.0))
+                                    initializer=tf.random_uniform([vocab_size, c.embedding_dim], -1.0, 1.0))
     embedded_input_bte = tf.nn.embedding_lookup(embeddings_we, input_bt)
     dialog_state_before_turn = tf.get_variable('dialog_state_before_turn',
-                                               initializer=tf.zeros([batch_size, hidden_state_dim], dtype='float32'),
+                                               initializer=tf.zeros([c.batch_size, c.hidden_state_dim], dtype='float32'),
                                                trainable=False)
 
     before_state_bh = cond(is_first_turn,
-                           lambda: gru.zero_state(batch_size, dtype='float32'),
+                           lambda: gru.zero_state(c.batch_size, dtype='float32'),
                            lambda: dialog_state_before_turn)
 
     inputs = [tf.squeeze(i, squeeze_dims=[1]) for i in tf.split(1, train_set.max_turn_len, embedded_input_bte)]
@@ -109,7 +107,7 @@ def main():
 
     dialog_state_before_turn.assign(state_bh)
     projection_ho = tf.get_variable('project2labels',
-                                    initializer=tf.random_uniform([hidden_state_dim, output_dim], -1.0, 1.0))
+                                    initializer=tf.random_uniform([c.hidden_state_dim, output_dim], -1.0, 1.0))
 
     logits_bo = tf.matmul(state_bh, projection_ho)
     tf.histogram_summary('logits', logits_bo)
@@ -130,7 +128,7 @@ def main():
 
     # Optimizer  -----------------------------------------------------------------------------------------------------
     logging.info('Creating optimizer')
-    optimizer = tf.train.AdamOptimizer(learning_rate)
+    optimizer = tf.train.AdamOptimizer(c.learning_rate)
     logging.info('Creating train_op')
     train_op = optimizer.minimize(loss)
 
@@ -143,19 +141,19 @@ def main():
     sess.run(init)
 
     # TB ---------------------------------------------------------------------------------------------------------
-    logging.info('See stats via tensorboard: $ tensorboard --logdir %s', log_dir)
-    train_writer = tf.train.SummaryWriter(log_dir, sess.graph)
+    logging.info('See stats via tensorboard: $ tensorboard --logdir %s', c.log_dir)
+    train_writer = tf.train.SummaryWriter(c.log_dir, sess.graph)
 
     # Train ---------------------------------------------------------------------------------------------------------
     train_summary = None
-    for e in range(epochs):
+    for e in range(c.epochs):
         logging.info('------------------------------')
         logging.info('Epoch %d', e)
 
         total_loss = 0
         total_acc = 0
         batch_count = 0
-        for bid, (dialogs_bTt, lengths_bT, labels_bT, masks_bT) in enumerate(next_batch(train_set, batch_size)):
+        for bid, (dialogs_bTt, lengths_bT, labels_bT, masks_bT) in enumerate(next_batch(train_set, c.batch_size)):
             turn_loss = 0
             turn_acc = 0
             n_turns = 0
@@ -192,7 +190,7 @@ def main():
             total_loss = 0
             total_acc = 0
             n_valid_batches = 0
-            for bid, (dialogs_bTt, lengths_bT, labels_bT, masks_bT) in enumerate(next_batch(work_set, batch_size)):
+            for bid, (dialogs_bTt, lengths_bT, labels_bT, masks_bT) in enumerate(next_batch(work_set, c.batch_size)):
                 turn_loss = 0
                 turn_acc = 0
                 n_turns = 0
@@ -231,8 +229,21 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-    logging.getLogger("tensorflow").setLevel(logging.WARNING)
-    logging.info('Start')
-    main()
+    ap = argparse.ArgumentParser(__doc__)
+    ap.add_argument('--learning_rate', type=float, default=0.005)
+    ap.add_argument('--batch_size', type=int, default=16)
+    ap.add_argument('--epochs', type=int, default=50)
+    ap.add_argument('--hidden_state_dim', type=int, default=200)
+    ap.add_argument('--embedding_dim', type=int, default=300)
+    ap.add_argument('--log_dir', default=None)
+    ap.add_argument('--exp', default='exp', help='human readable experiment name')
+    c = ap.parse_args()
+    c.name = 'log/%(u)s-%(n)s/%(u)s%(n)s' % {'u': datetime.utcnow().strftime('%Y-%m-%d-%H-%M-%S.%f')[:-3], 'n': c.exp}
+    c.log_name = '%s.log' % c.name
+    c.log_dir = c.log_dir or c.name + 'tensorboard'
+
+    os.makedirs(os.path.dirname(c.name), exist_ok=True)
+    setup_logging(c.log_name)
+    logging.info('Start with config: %s', c)
+    main(c)
     logging.info('Finished')

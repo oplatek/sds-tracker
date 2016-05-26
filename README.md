@@ -1,6 +1,6 @@
 Install
 -------
-Use `python3` and `tensorflow==0.8.0`
+Use `python3.4+` and `tensorflow==0.8.0`
 
 Contribute!
 -----------
