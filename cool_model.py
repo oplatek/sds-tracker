@@ -88,15 +88,6 @@ def main():
     is_first_turn = tf.placeholder(tf.bool)
     gru = GRUCell(hidden_state_dim)
 
-    # # MLP
-    # mlp_hidden_layer_dim = 50
-    # mlp_input2hidden_W = tf.get_variable('in2hid',
-    #                                      initializer=tf.random_normal([hidden_state_dim, mlp_hidden_layer_dim]))
-    # mlp_input2hidden_B = tf.Variable(tf.random_normal([mlp_hidden_layer_dim]))
-    # mlp_hidden2output_W = tf.get_variable('hid2out',
-    #                                       initializer=tf.random_normal([mlp_hidden_layer_dim, output_dim]))
-    # mlp_hidden2output_B = tf.Variable(tf.random_normal([output_dim]))
-
     embeddings_we = tf.get_variable('word_embeddings',
                                     initializer=tf.random_uniform([vocab_size, embedding_dim], -1.0, 1.0))
     embedded_input_bte = tf.nn.embedding_lookup(embeddings_we, input_bt)
