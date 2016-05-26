@@ -4,10 +4,15 @@ from tensorflow.python.ops.control_flow_ops import cond
 from tensorflow.python.ops.nn_ops import softmax_cross_entropy_with_logits as x_entropy
 import numpy as np
 import logging
+import random
+
 
 from tracker.dataset.dstc2 import Dstc2
 
 __author__ = '{Petr Belohlavek, Vojtech Hudecek, Josef Valek and Ondrej Platek}'
+seed = 123
+random.seed(seed)
+tf.set_random_seed(seed)
 
 
 def next_batch(train_set, batch_size):
@@ -55,11 +60,11 @@ def main():
 
     # Data ---------------------------------------------------------------------------------------------------
     data_portion = None  # 2 * batch_size
-    train_set = Dstc2('../data/dstc2/data.dstc2.train.json', sample_unk=0.01, first_n=data_portion)
-    valid_set = Dstc2('../data/dstc2/data.dstc2.dev.json', first_n=data_portion, sample_unk=0,
+    train_set = Dstc2('data/dstc2/data.dstc2.train.json', sample_unk=0.01, first_n=data_portion)
+    valid_set = Dstc2('data/dstc2/data.dstc2.dev.json', first_n=data_portion, sample_unk=0,
                       max_dial_len=train_set.max_dial_len, words_vocab=train_set.words_vocab,
                       labels_vocab=train_set.labels_vocab)
-    test_set = Dstc2('../data/dstc2/data.dstc2.test.json', first_n=data_portion, sample_unk=0,
+    test_set = Dstc2('data/dstc2/data.dstc2.test.json', first_n=data_portion, sample_unk=0,
                      max_dial_len=train_set.max_dial_len, words_vocab=train_set.words_vocab,
                      labels_vocab=train_set.labels_vocab)
 

@@ -1,3 +1,7 @@
+Install
+-------
+Use `python3` and `tensorflow==0.8.0`
+
 Contribute!
 -----------
 This is collaborative project.
