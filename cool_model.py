@@ -18,15 +18,12 @@ tf.set_random_seed(seed)
 
 
 def next_batch(train_set, batch_size):
-    b = 0
-    while 1:
+    indxs = np.random.permutation(len(train_set) // batch_size).tolist() # shuffling but discarding not fully filled last batch
+    for b in indxs:
         dlg = train_set.dialogs[b * batch_size:(b+1) * batch_size, :, :]
         lengths = train_set.turn_lens[b * batch_size:(b+1) * batch_size, :]
         labels = train_set.labels[b * batch_size:(b+1) * batch_size, :]
         mask = train_set.dial_mask[b * batch_size:(b+1) * batch_size, :]
-        b += 1
-        if dlg.shape[0] < batch_size:
-            break
         yield (dlg, lengths, labels, mask)
 
 
@@ -163,7 +160,7 @@ def main(c):
                                                               lengths_bT.transpose([1, 0]),
                                                               masks_bT.transpose([1,0])):
                 if sum(masks_b) == 0:
-                    break
+                    break 
 
                 _, batch_loss, batch_accuracy, train_summary = sess.run([train_op, loss, accuracy, tb_info],
                                                                         feed_dict={input_bt: turn_bt,
