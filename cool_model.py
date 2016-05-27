@@ -9,7 +9,7 @@ from datetime import datetime
 import logging, random, argparse, os
 
 from tracker.dataset.dstc2 import Dstc2
-from tracker.utils import setup_logging
+from tracker.utils import setup_logging, EarlyStopper
 
 __author__ = '{Petr Belohlavek, Vojtech Hudecek, Josef Valek and Ondrej Platek}'
 seed = 123
@@ -143,51 +143,16 @@ def main(c):
 
     # Train ---------------------------------------------------------------------------------------------------------
     train_summary = None
-    for e in range(c.epochs):
-        logging.info('------------------------------')
-        logging.info('Epoch %d', e)
+    step, stopper = 0, EarlyStopper(c.nbest_models, c.not_change_limit, c.name)
+    try:
+        for e in range(c.epochs):
+            logging.info('------------------------------')
+            logging.info('Epoch %d', e)
 
-        total_loss = 0
-        total_acc = 0
-        batch_count = 0
-        for bid, (dialogs_bTt, lengths_bT, labels_bT, masks_bT) in enumerate(next_batch(train_set, c.batch_size)):
-            turn_loss = 0
-            turn_acc = 0
-            n_turns = 0
-            first_run = True
-            for (turn_bt, label_b, lengths_b, masks_b) in zip(dialogs_bTt.transpose([1, 0, 2]),
-                                                              labels_bT.transpose([1, 0]),
-                                                              lengths_bT.transpose([1, 0]),
-                                                              masks_bT.transpose([1,0])):
-                if sum(masks_b) == 0:
-                    break 
-
-                _, batch_loss, batch_accuracy, train_summary = sess.run([train_op, loss, accuracy, tb_info],
-                                                                        feed_dict={input_bt: turn_bt,
-                                                                                   turn_lens_b: lengths_b,
-                                                                                   mask_b: masks_b,
-                                                                                   labels_b: label_b,
-                                                                                   is_first_turn: first_run})
-                first_run = False
-                turn_loss += batch_loss
-                turn_acc += batch_accuracy
-                n_turns += 1
-
-            total_loss += turn_loss / n_turns
-            total_acc += turn_acc / n_turns
-            batch_count += 1
-
-            logging.info('Batch %d/%d\r', bid, n_train_batches)
-
-        train_writer.add_summary(train_summary, e)
-        logging.info('Train cost %f', total_loss / batch_count)
-        logging.info('Train accuracy: %f', total_acc / batch_count)
-
-        def monitor_stream(work_set, name):
             total_loss = 0
             total_acc = 0
-            n_valid_batches = 0
-            for bid, (dialogs_bTt, lengths_bT, labels_bT, masks_bT) in enumerate(next_batch(work_set, c.batch_size)):
+            batch_count = 0
+            for bid, (dialogs_bTt, lengths_bT, labels_bT, masks_bT) in enumerate(next_batch(train_set, c.batch_size)):
                 turn_loss = 0
                 turn_acc = 0
                 n_turns = 0
@@ -195,45 +160,90 @@ def main(c):
                 for (turn_bt, label_b, lengths_b, masks_b) in zip(dialogs_bTt.transpose([1, 0, 2]),
                                                                   labels_bT.transpose([1, 0]),
                                                                   lengths_bT.transpose([1, 0]),
-                                                                  masks_bT.transpose([1, 0])):
+                                                                  masks_bT.transpose([1,0])):
                     if sum(masks_b) == 0:
-                        break
+                        break 
 
-                    input = np.pad(turn_bt, ((0, 0), (0, train_set.max_turn_len-turn_bt.shape[1])),
-                                   'constant', constant_values=0) if train_set.max_turn_len > turn_bt.shape[1]\
-                        else turn_bt
-
-                    predictions, batch_loss, batch_acc, valid_summary = sess.run([predict_b, loss, accuracy, tb_info],
-                                                                                 feed_dict={input_bt: input,
-                                                                                            turn_lens_b: lengths_b,
-                                                                                            labels_b: label_b,
-                                                                                            mask_b: masks_b,
-                                                                                            is_first_turn: first_run})
-                    turn_loss += batch_loss
-                    turn_acc += batch_acc
+                    _, batch_loss, batch_accuracy, train_summary = sess.run([train_op, loss, accuracy, tb_info],
+                                                                            feed_dict={input_bt: turn_bt,
+                                                                                       turn_lens_b: lengths_b,
+                                                                                       mask_b: masks_b,
+                                                                                       labels_b: label_b,
+                                                                                       is_first_turn: first_run})
                     first_run = False
+                    turn_loss += batch_loss
+                    turn_acc += batch_accuracy
                     n_turns += 1
+                    step += 1
 
                 total_loss += turn_loss / n_turns
                 total_acc += turn_acc / n_turns
-                n_valid_batches += 1
+                batch_count += 1
 
-            logging.info('%s cost: %f', name, total_loss/n_valid_batches)
-            logging.info('%s accuracy: %f', name, total_acc/n_valid_batches)
+                logging.info('Batch %d/%d\r', bid, n_train_batches)
 
-        monitor_stream(valid_set, 'Valid')
-        monitor_stream(test_set, 'Test')
+            train_writer.add_summary(train_summary, e)
+            logging.info('Train cost %f', total_loss / batch_count)
+            logging.info('Train accuracy: %f', total_acc / batch_count)
+
+            def monitor_stream(work_set, name):
+                total_loss = 0
+                total_acc = 0
+                n_valid_batches = 0
+                for bid, (dialogs_bTt, lengths_bT, labels_bT, masks_bT) in enumerate(next_batch(work_set, c.batch_size)):
+                    turn_loss = 0
+                    turn_acc = 0
+                    n_turns = 0
+                    first_run = True
+                    for (turn_bt, label_b, lengths_b, masks_b) in zip(dialogs_bTt.transpose([1, 0, 2]),
+                                                                      labels_bT.transpose([1, 0]),
+                                                                      lengths_bT.transpose([1, 0]),
+                                                                      masks_bT.transpose([1, 0])):
+                        if sum(masks_b) == 0:
+                            break
+
+                        input = np.pad(turn_bt, ((0, 0), (0, train_set.max_turn_len-turn_bt.shape[1])),
+                                       'constant', constant_values=0) if train_set.max_turn_len > turn_bt.shape[1]\
+                            else turn_bt
+
+                        predictions, batch_loss, batch_acc, valid_summary = sess.run([predict_b, loss, accuracy, tb_info],
+                                                                                     feed_dict={input_bt: input,
+                                                                                                turn_lens_b: lengths_b,
+                                                                                                labels_b: label_b,
+                                                                                                mask_b: masks_b,
+                                                                                                is_first_turn: first_run})
+                        turn_loss += batch_loss
+                        turn_acc += batch_acc
+                        first_run = False
+                        n_turns += 1
+
+                    total_loss += turn_loss / n_turns
+                    total_acc += turn_acc / n_turns
+                    n_valid_batches += 1
+
+                logging.info('%s cost: %f', name, total_loss/n_valid_batches)
+                logging.info('%s accuracy: %f', name, total_acc/n_valid_batches)
+                return  total_loss/n_valid_batches
+
+            stopper_reward = monitor_stream(valid_set, 'Valid')
+            monitor_stream(test_set, 'Test')
+    finally:
+        logging.info('Training stopped after %7d steps and %7.2f epochs. See logs for %s', step, step / len(train_set), c.log_name)
+        logging.info('Saving current state. Please wait!\nBest model has reward %7.2f form step %7d is %s' % stopper.highest_reward())
+        stopper.saver.save(sess=sess, save_path='%s-FINAL-%.4f-step-%07d' % (stopper.saver_prefix, stopper_reward, step))
 
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(__doc__)
     ap.add_argument('--learning_rate', type=float, default=0.005)
-    ap.add_argument('--batch_size', type=int, default=16)
-    ap.add_argument('--epochs', type=int, default=50)
+    ap.add_argument('--batch_size', type=int, default=1)
+    ap.add_argument('--epochs', type=int, default=500)
     ap.add_argument('--hidden_state_dim', type=int, default=200)
-    ap.add_argument('--embedding_dim', type=int, default=300)
+    ap.add_argument('--embedding_dim', type=int, default=100)
     ap.add_argument('--log_dir', default=None)
     ap.add_argument('--exp', default='exp', help='human readable experiment name')
+    ap.add_argument('--nbest_models', type=int, default=5)
+    ap.add_argument('--not_change_limit', type=int, default=10)
     c = ap.parse_args()
     c.name = 'log/%(u)s-%(n)s/%(u)s%(n)s' % {'u': datetime.utcnow().strftime('%Y-%m-%d-%H-%M-%S.%f')[:-3], 'n': c.exp}
     c.log_name = '%s.log' % c.name
