@@ -12,7 +12,7 @@ class Dstc2(TurnTrackerSet):
 
     def __init__(self, filename, 
             max_turn_len=None, max_dial_len=None, 
-            first_n=None, words_vocab=None, labels_vocab=None, sample_unk=0):
+            first_n=None, words_vocab=None, labels_vocab=None, labels_vocab_separate=None, sample_unk=0):
         delim = self.__class__.sys_usr_delim
         self._raw_data = raw_data = json.load(open(filename))
         self._first_n = min(first_n, len(raw_data)) if first_n else len(raw_data)
@@ -28,6 +28,15 @@ class Dstc2(TurnTrackerSet):
 
         self._vocab = words_vocab or Vocabulary([w for turns in dialogs for turn in turns for w in turn], extra_words=[delim])
         self._lab_vocab = labels_vocab or Vocabulary([w for turn in labels for w in turn])
+
+        # add vocabulary for all
+        vocab_separate = [self.split_label(w) for turn in labels for w in turn]
+        v_s = [[],[],[]]
+        for lab in vocab_separate:
+            for i in range(3):
+                v_s[i].append(lab[i])
+        self._lab_vocab_separate = labels_vocab_separate or (Vocabulary(v_s[0]),Vocabulary(v_s[1]),Vocabulary(v_s[2]))
+
 
         s = sorted([len(t) for turns in dialogs for t in turns])
         max_turn, perc95t = s[-1], s[int(0.95 * len(s))]
@@ -62,8 +71,22 @@ class Dstc2(TurnTrackerSet):
             for j, turn_label in enumerate(d):
                 self._labels[i, j] = self.labels_vocab.get_i(turn_label)
 
+        # add separate labels
+        self._labels_separate = np.zeros((len(dialogs), mdl, 3), dtype=np.int64)
+        for i, d in enumerate(labels):
+            for j, turn_label in enumerate(d):
+                for k, label in enumerate(self.split_label(turn_label)):
+                    self._labels_separate[i, j, k] = self.labels_vocab_separate[k].get_i(label)
+
     def __len__(self):
         return self._first_n
+
+    def split_label(self, label):
+        lab = label.split()
+        if len(lab) == 3:
+            return lab
+        else:
+            return [lab[0] + ' ' + lab[1], lab[2], lab[3]]
 
     @property
     def dial_mask(self):
@@ -81,12 +104,20 @@ class Dstc2(TurnTrackerSet):
         return self._labels
 
     @property
+    def labels_separate(self):
+        return self._labels_separate
+
+    @property
     def words_vocab(self):
         return self._vocab
 
     @property
     def labels_vocab(self):
         return self._lab_vocab
+
+    @property
+    def labels_vocab_separate(self):
+        return self._lab_vocab_separate
 
     @property
     def dial_lens(self):
