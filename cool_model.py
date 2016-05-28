@@ -227,6 +227,8 @@ def main(c):
 
             stopper_reward = monitor_stream(valid_set, 'Valid')
             monitor_stream(test_set, 'Test')
+            if not stopper.save_and_check(stopper_reward, step, sess):
+                raise RuntimeError('Training not improving on dev set')
     finally:
         logging.info('Training stopped after %7d steps and %7.2f epochs. See logs for %s', step, step / len(train_set), c.log_name)
         logging.info('Saving current state. Please wait!\nBest model has reward %7.2f form step %7d is %s' % stopper.highest_reward())
