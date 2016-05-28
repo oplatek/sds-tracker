@@ -327,6 +327,7 @@ if __name__ == '__main__':
     ap.add_argument('--learning_rate', type=float, default=0.005)
     ap.add_argument('--batch_size', type=int, default=1)
     ap.add_argument('--epochs', type=int, default=500)
+    ap.add_argument('--seed', type=int, default=123)
     ap.add_argument('--hidden_state_dim', type=int, default=200)
     ap.add_argument('--embedding_dim', type=int, default=100)
     ap.add_argument('--log_dir', default=None)
@@ -337,6 +338,9 @@ if __name__ == '__main__':
     c.name = 'log/%(u)s-%(n)s/%(u)s%(n)s' % {'u': datetime.utcnow().strftime('%Y-%m-%d-%H-%M-%S.%f')[:-3], 'n': c.exp}
     c.log_name = '%s.log' % c.name
     c.log_dir = c.log_dir or c.name + 'tensorboard'
+
+    random.seed(c.seed)
+    tf.set_random_seed(c.seed)
 
     os.makedirs(os.path.dirname(c.name), exist_ok=True)
     setup_logging(c.log_name)
