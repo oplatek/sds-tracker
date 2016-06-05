@@ -257,6 +257,7 @@ def main(c):
                     turn_loss += batch_loss
                     turn_acc += batch_accuracy
                     n_turns += 1
+                    step += 1
 
                 total_loss += turn_loss / n_turns
                 total_acc += turn_acc / n_turns
